@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Master Rush: Ultimate</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Orbitron', sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: #00f2ff; }
+        .stat { position: absolute; padding: 20px; text-shadow: 0 0 10px #00f2ff; }
+        #score-div { top: 20px; left: 20px; font-size: 2.5rem; }
+        #pose-div { top: 20px; right: 20px; text-align: right; font-size: 1.2rem; }
+        #video-container { position: absolute; bottom: 20px; right: 20px; width: 200px; border: 2px solid #00f2ff; border-radius: 10px; overflow: hidden; transform: scaleX(-1); }
+        #hint-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; opacity: 0; transition: 0.3s; font-weight: 900; }
+        #loading { position: absolute; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; }
+    </style>
+    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="loading">系统初始化中... (请确保开启摄像头)</div>
+
+<div id="ui">
+    <div id="score-div" class="stat">SCORE: 0<br><small id="combo">COMBO: 0</small></div>
+    <div id="pose-div" class="stat">NEXT POSE:<br><span id="pose-name" style="font-size: 3rem; color: gold;">READY?</span></div>
+    <div id="hint-text">PERFECT</div>
+</div>
+
+<div id="video-container">
+    <video id="input_video" style="width: 100%; display: block;"></video>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ========================
+// 1. 音效系统 (Web Audio)
+// ========================
+const AudioSys = {
+    ctx: new (window.AudioContext || window.webkitAudioContext)(),
+    play(freq, type = 'square', duration = 0.2) {
+        if(this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    }
+};
+
+// ========================
+// 2. 姿态判定算法 (8种)
+// ========================
+function getAngle(p1, p2) {
+    return Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+}
+
+const PoseLogic = {
+    'T-POSE': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 20 && Math.abs(getAngle(lm[12], lm[16])) > 160,
+    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y && Math.abs(lm[15].x - lm[16].x) > 0.4,
+    'L-SHAPE': (lm) => Math.abs(getAngle(lm[12], lm[16])) < 20 && lm[15].y < lm[11].y,
+    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y,
+    'ARCHER': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 20 && Math.abs(lm[16].x - lm[12].x) < 0.1,
+    'CROSS': (lm) => lm[15].x > lm[16].x,
+    'DAB': (lm) => lm[15].y < lm[11].y && Math.abs(getAngle(lm[11], lm[15])) > 140,
+    'ZEN': (lm) => Math.abs(lm[15].x - lm[16].x) < 0.1 && Math.abs(lm[15].y - lm[16].y) < 0.1
+};
+const POSE_KEYS = Object.keys(PoseLogic);
+
+// ========================
+// 3. 3D 场景渲染
+// ========================
+let scene, camera, renderer, composer, wall, currentTarget = 'T-POSE';
+let score = 0, combo = 0, speed = 0.4;
+
+function init3D() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // 霓虹效果
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
+
+    // 隧道
+    const grid = new THREE.GridHelper(200, 50, 0x00f2ff, 0x004455);
+    grid.rotation.x = Math.PI/2;
+    scene.add(grid);
+
+    spawnWall();
+    camera.position.z = 10;
+    camera.position.y = 2;
+}
+
+function spawnWall() {
+    if(wall) scene.remove(wall);
+    const geo = new THREE.BoxGeometry(12, 12, 0.5);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.5 });
+    wall = new THREE.Mesh(geo, mat);
+    wall.position.z = -100;
+    scene.add(wall);
+    
+    currentTarget = POSE_KEYS[Math.floor(Math.random()*POSE_KEYS.length)];
+    document.getElementById('pose-name').innerText = currentTarget;
+    AudioSys.play(200, 'sine', 0.1);
+}
+
+// ========================
+// 4. AI 姿态识别接入
+// ========================
+const videoElement = document.getElementById('input_video');
+const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
+
+pose.onResults((results) => {
+    document.getElementById('loading').style.display = 'none';
+    if (!results.poseLandmarks) return;
+    
+    const isMatched = PoseLogic[currentTarget](results.poseLandmarks);
+    
+    if (wall.position.z > 5 && wall.position.z < 8) {
+        if (isMatched) handleSuccess();
+        else handleFail();
+    }
+});
+
+function handleSuccess() {
+    if(wall.userData.processed) return;
+    wall.userData.processed = true;
+    score += 100 * (combo + 1);
+    combo++;
+    updateUI('PERFECT', '#00f2ff');
+    AudioSys.play(880, 'square', 0.1);
+    spawnWall();
+}
+
+function handleFail() {
+    if(wall.userData.processed) return;
+    wall.userData.processed = true;
+    combo = 0;
+    updateUI('MISS', '#ff0055');
+    AudioSys.play(110, 'sawtooth', 0.3);
+    spawnWall();
+}
+
+function updateUI(text, color) {
+    const hint = document.getElementById('hint-text');
+    hint.innerText = text;
+    hint.style.color = color;
+    hint.style.opacity = 1;
+    setTimeout(() => hint.style.opacity = 0, 500);
+    document.getElementById('score').innerText = score;
+    document.getElementById('combo').innerText = "COMBO: " + combo;
+}
+
+const camera_mp = new Camera(videoElement, {
+    onFrame: async () => { await pose.send({image: videoElement}); },
+    width: 640, height: 480
+});
+camera_mp.start();
+
+// 循环
+function animate() {
+    requestAnimationFrame(animate);
+    if(wall) {
+        wall.position.z += speed;
+        if(wall.position.z > 15) spawnWall();
+    }
+    composer.render();
+}
+
+init3D();
+animate();
+</script>
+</body>
+</html>
