@@ -3,96 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: 60s Challenge</title>
+    <title>Pose Master: Ghost Alignment Edition</title>
     <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
-        :root { --ui-blue: #009dff; --ui-gold: #ffcc00; --ui-red: #ff3344; }
+        :root { --ui-blue: #00f2ff; --ui-gold: #ffcc00; --ui-red: #ff3344; }
         body { margin: 0; background: #050510; overflow: hidden; font-family: 'Luckiest Guy', cursive; color: white; }
         
-        /* --- UI Overlay --- */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
-        /* 倒计时面板 */
+        /* 倒计时与分数 */
         #timer-panel { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); text-align: center; }
-        #timer-val { font-size: 4rem; color: #fff; text-shadow: 0 0 20px var(--ui-blue); }
-        #timer-label { font-size: 1rem; letter-spacing: 5px; color: var(--ui-blue); }
-
-        #diff-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
-        .diff-tab { padding: 5px 20px; background: #222; border-radius: 5px; font-size: 1rem; transform: skewX(-15deg); border: 1px solid #444; opacity: 0.5; }
-        .diff-tab.active { opacity: 1; background: var(--ui-red); border-color: #fff; box-shadow: 0 0 15px var(--ui-red); }
-        
-        #combo-panel { position: absolute; bottom: 30px; left: 40px; }
+        #timer-val { font-size: 4rem; text-shadow: 0 0 20px var(--ui-blue); }
         #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
         #score-val { font-size: 3.5rem; color: var(--ui-gold); }
 
-        /* 结算界面 */
+        /* 结算弹窗 */
         #game-over { 
-            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); 
+            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85); 
             z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; 
             backdrop-filter: blur(10px);
         }
-        .result-card { text-align: center; padding: 40px; border: 4px solid var(--ui-gold); border-radius: 20px; background: #111; }
-        .restart-btn { 
-            margin-top: 30px; padding: 15px 40px; background: var(--ui-blue); color: #fff; 
-            border: none; border-radius: 50px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; pointer-events: auto;
-        }
+        .result-card { text-align: center; padding: 40px; border: 4px solid var(--ui-blue); border-radius: 20px; background: #000; }
+        .restart-btn { margin-top: 20px; padding: 12px 30px; background: var(--ui-blue); border: none; border-radius: 30px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; pointer-events: auto; }
 
-        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5); font-size: 6rem; opacity: 0; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        /* 提示信息 */
+        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; opacity: 0; transition: 0.3s; }
         #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
 
-        #video-container { position: absolute; top: 20px; right: 20px; width: 160px; height: 120px; border: 3px solid var(--ui-blue); border-radius: 10px; overflow: hidden; transform: scaleX(-1); opacity: 0.8; }
-        
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
+<div id="loading">AI 神经元对齐中...</div>
+
 <div id="game-over">
     <div class="result-card">
-        <h1 style="color: var(--ui-red); font-size: 4rem; margin: 0;">TIME UP!</h1>
-        <p style="font-size: 2rem; margin: 20px 0;">FINAL SCORE: <span id="final-score" style="color: var(--ui-gold);">0</span></p>
-        <p style="font-size: 1.5rem; opacity: 0.8;">MAX COMBO: <span id="max-combo">0</span></p>
-        <button class="restart-btn" onclick="location.reload()">RETRY CHALLENGE</button>
+        <h1 style="color: var(--ui-red); font-size: 3rem;">TIME EXPIRED</h1>
+        <p style="font-size: 2rem;">FINAL SCORE: <span id="final-score" style="color: var(--ui-gold);">0</span></p>
+        <button class="restart-btn" onclick="location.reload()">再来一局</button>
     </div>
-</div>
-
-<div id="loading">
-    <div id="status">INITIALIZING AI...</div>
-    <p style="font-size: 1rem; margin-top: 20px;">请确保光线充足并允许摄像头权限</p>
 </div>
 
 <div id="ui-layer">
-    <div id="diff-container">
-        <div class="diff-tab active">EASY</div>
-        <div class="diff-tab">MEDIUM</div>
-        <div class="diff-tab">HARD</div>
-        <div class="diff-tab">EXTREME</div>
-    </div>
-
     <div id="timer-panel">
         <div id="timer-val">60</div>
-        <div id="timer-label">SECONDS LEFT</div>
+        <div style="font-size: 1rem; letter-spacing: 5px; color: var(--ui-blue);">SECONDS LEFT</div>
     </div>
-
-    <div id="combo-panel">
-        <span style="font-size: 3rem;">🔥</span>
-        <div style="font-size: 2.5rem;">COMBO X <span id="combo-num">0</span></div>
-    </div>
-
     <div id="score-panel">
         <div id="score-val">★ 0000</div>
-        <div style="color: var(--ui-blue);">SPEED: <span id="speed-indicator">1.0</span>x</div>
+        <div id="combo-text" style="color: var(--ui-blue);">COMBO X 0</div>
     </div>
-    
-    <div id="flash-msg">GREAT!</div>
+    <div id="flash-msg">PERFECT</div>
 </div>
 
-<div id="video-container"><video id="input_video" style="width:100%; height:100%; object-fit: cover;"></video></div>
 <div id="game-canvas"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
 <script type="importmap">
 {
     "imports": {
@@ -108,25 +76,40 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// --- 姿态定义 ---
-const getAngle = (p1, p2) => Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
-const PoseValidators = {
-    'T-POSE': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 25 && Math.abs(getAngle(lm[12], lm[16])) > 155,
-    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
-    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y,
-    'ZEN': (lm) => Math.hypot(lm[15].x-lm[16].x, lm[15].y-lm[16].y) < 0.15
+// ========================
+// 1. 动作指令绘制逻辑
+// ========================
+const POSE_GUIDES = {
+    'T-POSE': (ctx) => { line(ctx, 50,45, 15,45); line(ctx, 50,45, 85,45); line(ctx, 50,45, 50,85); },
+    'V-SHAPE': (ctx) => { line(ctx, 50,50, 20,15); line(ctx, 50,50, 80,15); line(ctx, 50,50, 50,85); },
+    'L-RIGHT': (ctx) => { line(ctx, 50,50, 50,15); line(ctx, 50,50, 85,50); line(ctx, 50,50, 50,85); },
+    'FLEX': (ctx) => { line(ctx, 50,55, 30,35); line(ctx, 30,35, 45,15); line(ctx, 50,55, 70,35); line(ctx, 70,35, 55,15); line(ctx, 50,55, 50,90); }
 };
-const POSES = Object.keys(PoseValidators);
+function line(ctx, x1, y1, x2, y2) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
 
-// --- 游戏变量 ---
-let scene, camera, renderer, composer, wall, tunnel;
-let score = 0, combo = 0, maxCombo = 0, gameSpeed = 0.6, isHit = false;
-let timeLeft = 60, isGameOver = false, gameStarted = false;
-let currentPoseKey = 'T-POSE';
+function createWallTexture(poseKey) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0, 30, 60, 0.9)';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 15; ctx.lineCap = 'round';
+    ctx.shadowBlur = 20; ctx.shadowColor = '#00f2ff';
+    ctx.translate(256, 256); ctx.scale(4, 4); ctx.translate(-50, -50);
+    ctx.beginPath(); ctx.arc(50, 15, 8, 0, Math.PI*2); POSE_GUIDES[poseKey](ctx); ctx.stroke();
+    return new THREE.CanvasTexture(canvas);
+}
 
-async function init3D() {
+// ========================
+// 2. 3D 引擎与幽灵残影
+// ========================
+let scene, camera, renderer, composer, wall, ghostPlayer;
+let score = 0, combo = 0, timeLeft = 60, isGameOver = false;
+let currentPoseKey = 'T-POSE', gameSpeed = 0.6;
+
+function init3D() {
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x050510, 0.05);
+    scene.fog = new THREE.FogExp2(0x050510, 0.04);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -134,122 +117,111 @@ async function init3D() {
 
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.85));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
 
-    const tunnelGeo = new THREE.CylinderGeometry(15, 15, 300, 32, 1, true);
-    const tunnelMat = new THREE.MeshBasicMaterial({ color: 0x0066ff, wireframe: true, transparent: true, opacity: 0.1, side: THREE.BackSide });
-    tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
-    tunnel.rotation.x = Math.PI / 2;
-    scene.add(tunnel);
+    // 创建幽灵残影 (用球体表示关节点)
+    ghostPlayer = new THREE.Group();
+    for(let i=0; i<33; i++) {
+        const sphere = new THREE.Mesh(
+            new THREE.SphereGeometry(0.15, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.6 })
+        );
+        ghostPlayer.add(sphere);
+    }
+    scene.add(ghostPlayer);
 
-    camera.position.set(0, 1.8, 8);
+    const grid = new THREE.GridHelper(400, 50, 0x00f2ff, 0x001122);
+    grid.rotation.x = Math.PI/2; scene.add(grid);
+
+    camera.position.set(0, 2, 10);
     spawnWall();
 }
 
 function spawnWall() {
     if(wall) scene.remove(wall);
-    currentPoseKey = POSES[Math.floor(Math.random() * POSES.length)];
+    currentPoseKey = Object.keys(POSE_GUIDES)[Math.floor(Math.random()*4)];
+    const tex = createWallTexture(currentPoseKey);
     const group = new THREE.Group();
-    const wallGeo = new THREE.BoxGeometry(12, 12, 0.2);
-    const wallMat = new THREE.MeshPhongMaterial({ color: 0x0088ff, transparent: true, opacity: 0.4 });
-    const silMesh = new THREE.Mesh(new THREE.PlaneGeometry(6,6), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true}));
-    silMesh.position.z = 0.15;
-    group.add(new THREE.Mesh(wallGeo, wallMat), silMesh);
-    group.position.z = -120;
-    wall = group; isHit = false;
-    scene.add(wall);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 0.2), new THREE.MeshBasicMaterial({ color: 0x003366, transparent: true, opacity: 0.4 }));
+    const sil = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+    sil.position.z = 0.12; group.add(mesh, sil);
+    group.position.z = -120; group.position.y = 2;
+    wall = group; scene.add(wall);
 }
 
-function startTimer() {
-    const timer = setInterval(() => {
-        if (timeLeft <= 0) {
-            clearInterval(timer);
-            endGame();
-        } else {
-            timeLeft--;
-            document.getElementById('timer-val').innerText = timeLeft;
-            if (timeLeft < 10) document.getElementById('timer-val').style.color = "var(--ui-red)";
-        }
-    }, 1000);
-}
+// ========================
+// 3. AI 逻辑与对齐反馈
+// ========================
+const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
 
-function endGame() {
-    isGameOver = true;
-    document.getElementById('game-over').style.display = 'flex';
-    document.getElementById('final-score').innerText = score;
-    document.getElementById('max-combo').innerText = maxCombo;
-}
+pose.onResults(res => {
+    document.getElementById('loading').style.display = 'none';
+    if(!res.poseLandmarks || isGameOver) return;
 
-function triggerResult(success) {
-    if (isHit || isGameOver) return;
-    isHit = true;
+    // 更新幽灵残影位置 (镜像映射)
+    res.poseLandmarks.forEach((lm, i) => {
+        const target = ghostPlayer.children[i];
+        target.position.x = (0.5 - lm.x) * 10; // 这里的 10 是场景缩放系数
+        target.position.y = (0.5 - lm.y) * 8 + 2;
+        target.position.z = 2; // 稍微在相机前面
+    });
+
+    // 姿态判定
+    const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
+    const lm = res.poseLandmarks;
+    const isMatched = {
+        'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 25 && Math.abs(getA(lm[12], lm[16])) > 155,
+        'V-SHAPE': () => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
+        'L-RIGHT': () => Math.abs(getA(lm[12], lm[16])) > 150 && lm[15].y < lm[11].y,
+        'FLEX': () => lm[15].y < lm[13].y && lm[16].y < lm[14].y
+    }[currentPoseKey]();
+
+    if(wall.position.z > 3 && wall.position.z < 8 && isMatched && !wall.userData.hit) {
+        handleResult(true);
+    }
+});
+
+function handleResult(success) {
+    wall.userData.hit = true;
     const msg = document.getElementById('flash-msg');
     if(success) {
-        score += 300; combo++;
-        if(combo > maxCombo) maxCombo = combo;
-        timeLeft += 2; // PERFECT 奖励 2 秒
-        msg.innerText = "GREAT! +2s";
-        msg.style.color = "var(--ui-gold)";
+        score += 300; combo++; timeLeft += 2;
+        msg.innerText = "PERFECT +2s"; msg.style.color = "var(--ui-blue)";
         gameSpeed += 0.01;
     } else {
-        combo = 0;
-        msg.innerText = "MISS!";
-        msg.style.color = "var(--ui-red)";
+        combo = 0; msg.innerText = "MISS!"; msg.style.color = "var(--ui-red)";
         gameSpeed = 0.6;
     }
     msg.classList.add('show');
-    updateUI();
     setTimeout(() => { msg.classList.remove('show'); spawnWall(); }, 600);
-}
-
-function updateUI() {
     document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
     document.getElementById('combo-num').innerText = combo;
-    document.getElementById('speed-indicator').innerText = (gameSpeed/0.6).toFixed(1);
-    const tabs = document.querySelectorAll('.diff-tab');
-    tabs.forEach(t => t.classList.remove('active'));
-    const idx = Math.min(Math.floor((gameSpeed - 0.6) / 0.3), 3);
-    tabs[idx].classList.add('active');
 }
 
-async function setupAI() {
-    const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-    pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.5 });
-    pose.onResults((results) => {
-        if (!results.poseLandmarks || isGameOver) return;
-        if (!gameStarted) {
-            gameStarted = true;
-            document.getElementById('loading').style.display = 'none';
-            startTimer();
-        }
-        if (isHit) return;
-        const matched = PoseValidators[currentPoseKey](results.poseLandmarks);
-        if (wall.position.z > 3 && wall.position.z < 7.5 && matched) triggerResult(true);
-    });
-
-    const cam = new Camera(document.getElementById('input_video'), {
-        onFrame: async () => { await pose.send({image: document.getElementById('input_video')}); },
-        width: 640, height: 480
-    });
-    cam.start();
-}
+// 启动
+const video = document.createElement('video');
+const cam = new Camera(video, {
+    onFrame: async () => { await pose.send({image: video}); },
+    width: 640, height: 480
+});
 
 function animate() {
-    if (isGameOver) return;
+    if(isGameOver) return;
     requestAnimationFrame(animate);
-    if(tunnel) {
-        tunnel.rotation.y += 0.01;
-        tunnel.position.z += gameSpeed * 2;
-        if(tunnel.position.z > 100) tunnel.position.z = 0;
-    }
     if(wall) {
         wall.position.z += gameSpeed;
-        if(wall.position.z > 10 && !isHit) triggerResult(false);
+        if(wall.position.z > 12 && !wall.userData.hit) handleResult(false);
     }
     composer.render();
 }
 
-window.onload = () => { init3D(); setupAI(); animate(); };
+let timer = setInterval(() => {
+    if(timeLeft <= 0) { clearInterval(timer); isGameOver = true; document.getElementById('game-over').style.display = 'flex'; document.getElementById('final-score').innerText = score; }
+    else { timeLeft--; document.getElementById('timer-val').innerText = timeLeft; }
+}, 1000);
+
+init3D(); cam.start(); animate();
 </script>
 </body>
 </html>
