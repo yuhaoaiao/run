@@ -3,30 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master Rush: Visual Instruction Edition</title>
-    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <title>Pose Master: Trial of the Wild</title>
+    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Noto+Serif+SC:wght@300;700&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #050010; overflow: hidden; font-family: 'Orbitron', sans-serif; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: #fff; }
-        .hud { position: absolute; padding: 20px; text-shadow: 0 0 15px #00f2ff; }
-        #score-panel { bottom: 20px; right: 20px; text-align: right; font-size: 2.5rem; }
-        #combo-panel { bottom: 20px; left: 20px; font-size: 2rem; color: #ff00ff; }
-        #video-preview { position: absolute; top: 20px; right: 20px; width: 180px; border: 2px solid #00f2ff; border-radius: 8px; transform: scaleX(-1); opacity: 0.8; }
-        #msg-popup { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; font-weight: 900; opacity: 0; transition: 0.3s; pointer-events: none; }
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; color: #00f2ff; font-size: 1.5rem; }
+        :root {
+            --sheikah-blue: rgba(0, 255, 255, 0.8);
+            --ancient-gold: rgba(255, 215, 0, 0.9);
+            --bg-dark: #050b10;
+        }
+        body { margin: 0; background: var(--bg-dark); overflow: hidden; font-family: 'Noto Serif SC', serif; color: white; }
+        
+        /* --- 塞尔达风格 HUD --- */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        
+        /* 顶部进度条 - 模仿精力槽/任务状态 */
+        .top-header { position: absolute; top: 40px; width: 100%; text-align: center; }
+        .pose-title { 
+            font-family: 'Cinzel', serif; font-size: 1.2rem; letter-spacing: 8px; 
+            color: var(--ancient-gold); text-shadow: 0 0 10px rgba(255,215,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        /* 分数显示 - 极简排版 */
+        #score-panel { position: absolute; bottom: 50px; right: 60px; text-align: right; border-right: 1px solid var(--sheikah-blue); padding-right: 20px; }
+        .label { font-size: 0.8rem; letter-spacing: 3px; opacity: 0.7; margin-bottom: 5px; }
+        #score { font-family: 'Cinzel', serif; font-size: 3rem; font-weight: 400; color: #fff; }
+
+        /* 连击反馈 - 环形进度感 */
+        #combo-container { position: absolute; bottom: 50px; left: 60px; display: flex; align-items: flex-end; }
+        #combo-wheel { width: 60px; height: 60px; border: 2px solid var(--sheikah-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px; position: relative; }
+        #combo-wheel::after { content: ''; position: absolute; width: 70px; height: 70px; border: 1px dashed var(--sheikah-blue); border-radius: 50%; animation: rotate 10s linear infinite; }
+        #combo { font-family: 'Cinzel', serif; font-size: 1.8rem; }
+
+        /* 提示文字 - 仿游戏大标题弹出 */
+        #flash-msg { 
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+            width: 100%; text-align: center; pointer-events: none;
+        }
+        .msg-main { 
+            font-size: 4.5rem; letter-spacing: 20px; font-weight: 700;
+            background: linear-gradient(to bottom, #fff 40%, var(--ancient-gold));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            opacity: 0; transition: 0.8s cubic-bezier(0.2, 0, 0.2, 1);
+            filter: drop-shadow(0 0 15px rgba(0,255,255,0.3));
+        }
+        .msg-sub { font-size: 1rem; letter-spacing: 15px; color: var(--ancient-gold); opacity: 0; transition: 1s; margin-top: 10px; text-transform: uppercase; }
+
+        /* 摄像头预览 - 希卡石边框 */
+        #video-container { 
+            position: absolute; top: 30px; right: 30px; width: 160px; 
+            border: 1px solid var(--sheikah-blue); padding: 3px; background: rgba(0,0,0,0.3);
+            border-radius: 2px; box-shadow: 0 0 20px rgba(0,255,255,0.1);
+        }
+        #video-preview { width: 100%; display: block; transform: scaleX(-1); filter: contrast(1.1) brightness(1.1); }
+
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; letter-spacing: 5px; color: var(--sheikah-blue); }
     </style>
 </head>
 <body>
 
-<div id="loading">AI 视觉神经元加载中... (请确保开启摄像头)</div>
+<div id="loading">POSE TRIAL INITIALIZING...</div>
 
-<div id="ui">
-    <div id="score-panel" class="hud">SCORE: <span id="score">0</span></div>
-    <div id="combo-panel" class="hud">COMBO: <span id="combo">0</span></div>
-    <div id="msg-popup">PERFECT</div>
+<div id="ui-layer">
+    <div class="top-header">
+        <div class="pose-title">TRIAL OF ANCIENT POSE</div>
+        <div style="width: 200px; height: 1px; background: linear-gradient(to right, transparent, var(--ancient-gold), transparent); margin: 0 auto;"></div>
+    </div>
+
+    <div id="score-panel">
+        <div class="label">RUPEES COLLECTED</div>
+        <div id="score">00000</div>
+    </div>
+
+    <div id="combo-container">
+        <div id="combo-wheel"><span id="combo">0</span></div>
+        <div>
+            <div class="label" style="margin:0">COMBO</div>
+            <div style="width: 100px; height: 2px; background: var(--sheikah-blue);"></div>
+        </div>
+    </div>
+
+    <div id="flash-msg">
+        <div class="msg-main" id="m-main">PURIFIED</div>
+        <div class="msg-sub" id="m-sub">The trial continues</div>
+    </div>
 </div>
 
-<video id="video-preview" autoplay playsinline></video>
+<div id="video-container">
+    <video id="video-preview" autoplay playsinline></video>
+</div>
+
 <div id="game-canvas"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -47,44 +115,48 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ========================
-// 1. 姿态定义与绘制逻辑 (Instruction Generator)
+// 1. 希卡风格指令绘制 (Ancient Runes)
 // ========================
 const POSE_DEFS = {
-    'T-POSE': (ctx) => { line(ctx, 50,50, 20,50); line(ctx, 50,50, 80,50); line(ctx, 50,50, 50,85); }, // T字
-    'V-SHAPE': (ctx) => { line(ctx, 50,50, 25,20); line(ctx, 50,50, 75,20); line(ctx, 50,50, 50,85); }, // V字
-    'L-RIGHT': (ctx) => { line(ctx, 50,50, 50,20); line(ctx, 50,50, 80,50); line(ctx, 50,50, 50,85); }, // L字(右)
-    'L-LEFT': (ctx) => { line(ctx, 50,50, 50,20); line(ctx, 50,50, 20,50); line(ctx, 50,50, 50,85); }, // L字(左)
-    'FLEX': (ctx) => { line(ctx, 50,55, 30,35); line(ctx, 30,35, 45,20); line(ctx, 50,55, 70,35); line(ctx, 70,35, 55,20); line(ctx, 50,55, 50,90); }, // 肌肉
-    'ARCHER': (ctx) => { line(ctx, 50,50, 20,50); line(ctx, 50,50, 55,35); line(ctx, 55,35, 50,25); line(ctx, 50,50, 50,85); }, // 拉弓
-    'ZEN': (ctx) => { line(ctx, 50,50, 40,40); line(ctx, 50,50, 60,40); line(ctx, 50,50, 50,90); }, // 禅定
-    'DAB': (ctx) => { line(ctx, 50,50, 20,40); line(ctx, 50,50, 80,20); line(ctx, 50,50, 50,85); } // 潮流
+    'T-POSE': (ctx) => { runeLine(ctx, 50,45, 15,45); runeLine(ctx, 50,45, 85,45); runeLine(ctx, 50,45, 50,85); },
+    'V-SHAPE': (ctx) => { runeLine(ctx, 50,50, 20,20); runeLine(ctx, 50,50, 80,20); runeLine(ctx, 50,50, 50,85); },
+    'L-RIGHT': (ctx) => { runeLine(ctx, 50,50, 50,15); runeLine(ctx, 50,50, 85,50); runeLine(ctx, 50,50, 50,85); },
+    'FLEX': (ctx) => { runeLine(ctx, 50,55, 30,35); runeLine(ctx, 30,35, 40,15); runeLine(ctx, 50,55, 70,35); runeLine(ctx, 70,35, 60,15); runeLine(ctx, 50,55, 50,90); },
+    'ZEN': (ctx) => { ctx.arc(50, 55, 12, 0, Math.PI*2); runeLine(ctx, 50,67, 50,90); },
+    'ARCHER': (ctx) => { runeLine(ctx, 15,50, 60,50); runeLine(ctx, 60,50, 75,30); runeLine(ctx, 75,30, 70,15); runeLine(ctx, 50,50, 50,85); }
 };
 
-function line(ctx, x1, y1, x2, y2) {
+function runeLine(ctx, x1, y1, x2, y2) {
     ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    // 在关节点画小圆点增加精致感
+    ctx.save(); ctx.fillStyle = '#00f2ff';
+    ctx.beginPath(); ctx.arc(x2, y2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 }
 
-function createPoseTexture(poseKey) {
+function createAncientTexture(poseKey) {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     
-    // 背景稍微带点透明深色
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    // 背景：带纹理的半透明蓝色
+    ctx.fillStyle = 'rgba(0, 40, 60, 0.6)';
     ctx.fillRect(0, 0, 512, 512);
 
-    // 绘制霓虹小人
+    // 装饰框
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(20, 20, 472, 472);
+
+    // 绘制古代符文小人
     ctx.strokeStyle = '#00f2ff';
-    ctx.lineWidth = 15;
-    ctx.lineCap = 'round';
-    ctx.shadowBlur = 30;
+    ctx.lineWidth = 8;
+    ctx.shadowBlur = 20;
     ctx.shadowColor = '#00f2ff';
 
-    ctx.scale(5.12, 5.12); // 缩放到 100x100 的逻辑空间
+    ctx.scale(5.12, 5.12);
     ctx.beginPath();
-    // 头部
-    ctx.arc(50, 15, 8, 0, Math.PI * 2);
-    // 身体部位由 POSE_DEFS 决定
+    ctx.arc(50, 20, 6, 0, Math.PI * 2); // 头部
     POSE_DEFS[poseKey](ctx);
     ctx.stroke();
 
@@ -92,106 +164,147 @@ function createPoseTexture(poseKey) {
 }
 
 // ========================
-// 2. 姿态判定核心 (Vector Logic)
+// 2. 判定算法 (优化版)
 // ========================
 function getAngle(p1, p2) { return Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI); }
-
 const PoseValidators = {
     'T-POSE': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 25 && Math.abs(getAngle(lm[12], lm[16])) > 155,
-    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y && Math.abs(lm[15].x - lm[16].x) > 0.4,
+    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
     'L-RIGHT': (lm) => Math.abs(getAngle(lm[12], lm[16])) > 150 && lm[15].y < lm[11].y,
-    'L-LEFT': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 30 && lm[16].y < lm[12].y,
-    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y && getAngle(lm[11], lm[13]) < -10,
-    'ARCHER': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 20 && Math.abs(lm[16].x - lm[12].x) < 0.1,
-    'ZEN': (lm) => Math.hypot(lm[15].x-lm[16].x, lm[15].y-lm[16].y) < 0.1,
-    'DAB': (lm) => lm[15].y < lm[11].y && Math.abs(getAngle(lm[11], lm[15])) > 130
+    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y,
+    'ZEN': (lm) => Math.hypot(lm[15].x-lm[16].x, lm[15].y-lm[16].y) < 0.15,
+    'ARCHER': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 30 || Math.abs(getAngle(lm[12], lm[16])) > 150
 };
 
 // ========================
-// 3. 3D 引擎与核心逻辑
+// 3. 3D 环境与后期
 // ========================
-let scene, camera, renderer, composer, wallGroup;
-let currentPoseKey = 'T-POSE', score = 0, combo = 0, speed = 0.6;
+let scene, camera, renderer, composer, wallGroup, envParticles;
+let currentPoseKey = 'T-POSE', score = 0, combo = 0, speed = 0.5;
 
 function init() {
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    scene.fog = new THREE.FogExp2(0x050b10, 0.03);
+
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('game-canvas').appendChild(renderer.domElement);
 
-    // 霓虹后期
+    // 塞尔达式的柔和辉光
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.9);
     composer.addPass(bloom);
 
-    // 地面网格
-    const grid = new THREE.GridHelper(400, 60, 0x00f2ff, 0x002233);
-    grid.rotation.x = Math.PI/2;
+    // 绘制地面 - 模仿神庙地板
+    const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+    const floorMat = new THREE.MeshPhongMaterial({ color: 0x0a1520, specular: 0x00ffff, shininess: 50 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(400, 80, 0x00ffff, 0x001122);
+    grid.position.y = 0.05;
     scene.add(grid);
 
+    // 增加环境浮游粒子
+    addEnvParticles();
+
+    // 灯光
+    const sun = new THREE.DirectionalLight(0x00ffff, 1);
+    sun.position.set(5, 10, 5);
+    scene.add(sun, new THREE.AmbientLight(0x102030));
+
     spawnWall();
-    camera.position.set(0, 1.8, 10);
+    camera.position.set(0, 2, 10);
     animate();
+}
+
+function addEnvParticles() {
+    const geo = new THREE.BufferGeometry();
+    const pos = [];
+    for(let i=0; i<500; i++) {
+        pos.push(Math.random()*40-20, Math.random()*10, Math.random()*100-80);
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ size: 0.05, color: 0x00ffff, transparent: true, opacity: 0.5 });
+    envParticles = new THREE.Points(geo, mat);
+    scene.add(envParticles);
 }
 
 function spawnWall() {
     if(wallGroup) scene.remove(wallGroup);
     
-    currentPoseKey = Object.keys(POSE_DEFS)[Math.floor(Math.random() * 8)];
-    const texture = createPoseTexture(currentPoseKey);
+    currentPoseKey = Object.keys(POSE_DEFS)[Math.floor(Math.random() * Object.keys(POSE_DEFS).length)];
+    const texture = createAncientTexture(currentPoseKey);
 
     wallGroup = new THREE.Group();
     
-    // 主墙体 (半透明力场)
-    const wallGeo = new THREE.BoxGeometry(10, 10, 0.2);
-    const wallMat = new THREE.MeshBasicMaterial({ color: 0x002244, transparent: true, opacity: 0.4 });
+    // 墙体 - 模仿古代能量屏障
+    const wallGeo = new THREE.BoxGeometry(10, 10, 0.1);
+    const wallMat = new THREE.MeshPhongMaterial({ 
+        color: 0x00ffff, transparent: true, opacity: 0.2,
+        emissive: 0x00ffff, emissiveIntensity: 0.5
+    });
     const wallBase = new THREE.Mesh(wallGeo, wallMat);
     
-    // 姿态剪影面 (核心指令)
-    const silGeo = new THREE.PlaneGeometry(6, 6);
+    // 符文指令
+    const silGeo = new THREE.PlaneGeometry(5, 5);
     const silMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
     const silhouette = new THREE.Mesh(silGeo, silMat);
-    silhouette.position.z = 0.11; // 贴在墙面上
+    silhouette.position.z = 0.06;
 
     wallGroup.add(wallBase, silhouette);
-    wallGroup.position.z = -120;
-    wallGroup.position.y = 1.5;
+    wallGroup.position.set(0, 1.8, -100);
     scene.add(wallGroup);
 }
 
-// AI 识别接入
+// MediaPipe 接入
 const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
 pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
 pose.onResults(res => {
     document.getElementById('loading').style.display = 'none';
     if(!res.poseLandmarks || !wallGroup || wallGroup.userData.hit) return;
     
-    const matched = PoseValidators[currentPoseKey](res.poseLandmarks);
-    // 判定区域: 距离相机 3-8 米
-    if(wallGroup.position.z > 3 && wallGroup.position.z < 8) {
-        if(matched) handleResult(true);
+    if(wallGroup.position.z > 4 && wallGroup.position.z < 8) {
+        if(PoseValidators[currentPoseKey](res.poseLandmarks)) handleResult(true);
     }
 });
 
 function handleResult(isSuccess) {
     wallGroup.userData.hit = true;
-    const msg = document.getElementById('msg-popup');
+    const mMain = document.getElementById('m-main');
+    const mSub = document.getElementById('m-sub');
+
     if(isSuccess) {
         score += 100; combo++;
-        msg.innerText = "PERFECT!"; msg.style.color = "#00f2ff";
-        // 瞬间加速效果
-        speed += 0.02;
+        mMain.innerText = "PURIFIED";
+        mMain.style.background = "linear-gradient(to bottom, #fff, var(--ancient-gold))";
+        mMain.style.webkitBackgroundClip = "text";
+        speed += 0.01;
     } else {
         combo = 0;
-        msg.innerText = "MISS!"; msg.style.color = "#ff0055";
-        speed = 0.6; // 重置速度
+        mMain.innerText = "FAILED";
+        mMain.style.background = "linear-gradient(to bottom, #fff, #ff4400)";
+        mMain.style.webkitBackgroundClip = "text";
+        speed = 0.5;
     }
-    msg.style.opacity = 1;
-    setTimeout(() => msg.style.opacity = 0, 500);
+
+    // 优雅的文字动画
+    mMain.parentElement.style.opacity = 0; // 重置
+    setTimeout(() => {
+        mMain.style.opacity = 1; mMain.style.letterSpacing = "20px";
+        mSub.style.opacity = 1; mSub.style.letterSpacing = "15px";
+        mMain.parentElement.style.opacity = 1;
+    }, 50);
+
+    setTimeout(() => {
+        mMain.style.opacity = 0; mSub.style.opacity = 0;
+        mMain.style.letterSpacing = "40px"; // 扩散消失
+    }, 1200);
     
-    document.getElementById('score').innerText = score;
+    document.getElementById('score').innerText = score.toString().padStart(5, '0');
     document.getElementById('combo').innerText = combo;
     spawnWall();
 }
@@ -200,9 +313,10 @@ function animate() {
     requestAnimationFrame(animate);
     if(wallGroup) {
         wallGroup.position.z += speed;
-        // 漏掉墙体判定为失败
         if(wallGroup.position.z > 12 && !wallGroup.userData.hit) handleResult(false);
     }
+    // 粒子微动
+    if(envParticles) envParticles.position.z += 0.1;
     composer.render();
 }
 
