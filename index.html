@@ -1,34 +1,103 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master Rush: Ultimate</title>
+    <title>Pose Master Rush: Synthwave Edition</title>
+    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Orbitron', sans-serif; }
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff00ff;
+            --neon-purple: #9d00ff;
+            --neon-yellow: #ffeb3b;
+            --bg-color: #0a001a;
+        }
+        body { margin: 0; background: var(--bg-color); overflow: hidden; font-family: 'Orbitron', sans-serif; user-select: none; }
         canvas { display: block; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: #00f2ff; }
-        .stat { position: absolute; padding: 20px; text-shadow: 0 0 10px #00f2ff; }
-        #score-div { top: 20px; left: 20px; font-size: 2.5rem; }
-        #pose-div { top: 20px; right: 20px; text-align: right; font-size: 1.2rem; }
-        #video-container { position: absolute; bottom: 20px; right: 20px; width: 200px; border: 2px solid #00f2ff; border-radius: 10px; overflow: hidden; transform: scaleX(-1); }
-        #hint-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; opacity: 0; transition: 0.3s; font-weight: 900; }
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; }
+
+        /* --- UI Overlay --- */
+        #ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: #fff; text-shadow: 0 0 10px var(--neon-blue); }
+
+        /* Top Difficulty Bar */
+        #difficulty-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 2px solid var(--neon-blue); box-shadow: 0 0 15px var(--neon-blue); }
+        .diff-step { padding: 5px 15px; border-radius: 15px; font-size: 0.9rem; font-weight: bold; opacity: 0.5; transition: all 0.3s; }
+        .diff-step.active { opacity: 1; background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple)); box-shadow: 0 0 10px #fff; }
+
+        /* Score & Combo */
+        #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
+        #score-val { font-size: 3.5rem; font-weight: 900; color: var(--neon-yellow); text-shadow: 0 0 20px var(--neon-yellow), 0 0 40px var(--neon-yellow); }
+        #score-label { font-size: 1.2rem; color: var(--neon-blue); }
+
+        #combo-panel { position: absolute; bottom: 30px; left: 40px; display: flex; align-items: center; }
+        #combo-fire { font-size: 2.5rem; color: #ff5722; margin-right: 10px; text-shadow: 0 0 20px #ff5722; filter: drop-shadow(0 0 5px #fff); animation: flicker 1.5s infinite alternate; }
+        #combo-val { font-size: 2.5rem; font-weight: 900; color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); }
+        #combo-label { font-size: 1rem; color: var(--neon-blue); margin-left: 5px; }
+
+        /* Next Pose Hint */
+        #pose-hint { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); text-align: center; }
+        #pose-name { font-size: 2.5rem; font-weight: 900; color: var(--neon-yellow); text-shadow: 0 0 20px var(--neon-yellow); letter-spacing: 2px; }
+        #pose-icon-hint { font-size: 1.5rem; margin-top: 5px; }
+
+        /* Feedback Popup */
+        #feedback-popup { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 5rem; font-weight: 900; text-align: center; opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 20; pointer-events: none; white-space: nowrap; }
+        #feedback-popup.great { color: var(--neon-blue); text-shadow: 0 0 30px var(--neon-blue), 0 0 60px #fff; transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        #feedback-popup.miss { color: #ff0055; text-shadow: 0 0 30px #ff0055, 0 0 60px #fff; transform: translate(-50%, -50%) scale(1); opacity: 1; animation: shake 0.5s; }
+        #feedback-sub { display: block; font-size: 3rem; margin-top: 10px; color: var(--neon-yellow); }
+
+        /* Video Preview */
+        #video-container { position: absolute; top: 20px; right: 20px; width: 200px; height: 150px; border: 3px solid var(--neon-blue); border-radius: 10px; overflow: hidden; transform: scaleX(-1); box-shadow: 0 0 20px var(--neon-blue); opacity: 0.8; }
+        #input_video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Loading Screen */
+        #loading-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: var(--neon-blue); }
+        #loading-text { font-size: 2rem; margin-top: 20px; text-shadow: 0 0 15px var(--neon-blue); }
+        .loader { border: 5px solid rgba(0, 242, 255, 0.2); border-top: 5px solid var(--neon-blue); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+
+        /* Animations */
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        @keyframes shake { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 25% { transform: translate(-55%, -50%) scale(1); } 75% { transform: translate(-45%, -50%) scale(1); } }
     </style>
-    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div id="loading">系统初始化中... (请确保开启摄像头)</div>
+<div id="loading-screen">
+    <div class="loader"></div>
+    <div id="loading-text">INITIALIZING SYSTEM...<br><small style="font-size: 1rem; opacity: 0.7;">Please allow camera access.</small></div>
+</div>
 
-<div id="ui">
-    <div id="score-div" class="stat">SCORE: 0<br><small id="combo">COMBO: 0</small></div>
-    <div id="pose-div" class="stat">NEXT POSE:<br><span id="pose-name" style="font-size: 3rem; color: gold;">READY?</span></div>
-    <div id="hint-text">PERFECT</div>
+<div id="ui-overlay">
+    <div id="difficulty-bar">
+        <div class="diff-step active">EASY</div>
+        <div class="diff-step">MEDIUM</div>
+        <div class="diff-step">HARD</div>
+        <div class="diff-step">EXTREME</div>
+    </div>
+
+    <div id="pose-hint">
+        <div id="pose-name">GET READY!</div>
+        <div id="pose-icon-hint"></div>
+    </div>
+
+    <div id="score-panel">
+        <div id="score-val">0</div>
+        <div id="score-label">SCORE</div>
+    </div>
+    <div id="combo-panel">
+        <span id="combo-fire">🔥</span>
+        <div id="combo-val">x0</div>
+        <div id="combo-label">COMBO</div>
+    </div>
+
+    <div id="feedback-popup">
+        <span id="feedback-main">GREAT!</span>
+        <span id="feedback-sub">+300</span>
+    </div>
 </div>
 
 <div id="video-container">
-    <video id="input_video" style="width: 100%; display: block;"></video>
+    <video id="input_video" autoplay playsinline></video>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -49,150 +118,444 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ========================
-// 1. 音效系统 (Web Audio)
+// 1. 音效系统 (Synthwave SFX)
 // ========================
 const AudioSys = {
     ctx: new (window.AudioContext || window.webkitAudioContext)(),
-    play(freq, type = 'square', duration = 0.2) {
-        if(this.ctx.state === 'suspended') this.ctx.resume();
+    play(type) {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = type;
+        
+        let freq, duration, waveType, volume;
+        
+        switch(type) {
+            case 'success': // 清脆的合成器音
+                freq = 880; duration = 0.3; waveType = 'square'; volume = 0.15;
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 2, this.ctx.currentTime + 0.1); // 音调上升
+                break;
+            case 'fail': // 低沉的故障音
+                freq = 150; duration = 0.4; waveType = 'sawtooth'; volume = 0.25;
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(freq / 2, this.ctx.currentTime + duration); // 音调下降
+                break;
+            case 'spawn': // 出现音效
+                freq = 440; duration = 0.2; waveType = 'sine'; volume = 0.05;
+                gain.gain.setValueAtTime(0, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(volume, this.ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+                break;
+        }
+
+        osc.type = waveType;
         osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
-        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
     }
 };
 
 // ========================
-// 2. 姿态判定算法 (8种)
+// 2. 八大姿态判定算法 (Vector Angle)
 // ========================
-function getAngle(p1, p2) {
-    return Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+function getAngle(p1, p2, p3) {
+    // 计算三点形成的角度 (p2为顶点)
+    const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+    const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+    const dot = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    const angleRad = Math.acos(dot / (mag1 * mag2));
+    return angleRad * (180 / Math.PI);
+}
+
+function isHorizontal(p1, p2, tolerance = 20) {
+    const angle = Math.abs(Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI));
+    return angle < tolerance || Math.abs(angle - 180) < tolerance;
+}
+
+function isVertical(p1, p2, tolerance = 20) {
+    const angle = Math.abs(Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI));
+    return Math.abs(angle - 90) < tolerance || Math.abs(angle - 270) < tolerance;
 }
 
 const PoseLogic = {
-    'T-POSE': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 20 && Math.abs(getAngle(lm[12], lm[16])) > 160,
-    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y && Math.abs(lm[15].x - lm[16].x) > 0.4,
-    'L-SHAPE': (lm) => Math.abs(getAngle(lm[12], lm[16])) < 20 && lm[15].y < lm[11].y,
-    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y,
-    'ARCHER': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 20 && Math.abs(lm[16].x - lm[12].x) < 0.1,
-    'CROSS': (lm) => lm[15].x > lm[16].x,
-    'DAB': (lm) => lm[15].y < lm[11].y && Math.abs(getAngle(lm[11], lm[15])) > 140,
-    'ZEN': (lm) => Math.abs(lm[15].x - lm[16].x) < 0.1 && Math.abs(lm[15].y - lm[16].y) < 0.1
+    'T-POSE': (lm) => {
+        // 双臂伸直且水平
+        const leftArmAngle = getAngle(lm[11], lm[13], lm[15]);
+        const rightArmAngle = getAngle(lm[12], lm[14], lm[16]);
+        return leftArmAngle > 160 && rightArmAngle > 160 && isHorizontal(lm[11], lm[15]) && isHorizontal(lm[12], lm[16]);
+    },
+    'V-SHAPE': (lm) => {
+        // 双臂伸直，高举过头
+        const leftArmAngle = getAngle(lm[11], lm[13], lm[15]);
+        const rightArmAngle = getAngle(lm[12], lm[14], lm[16]);
+        return leftArmAngle > 150 && rightArmAngle > 150 && lm[15].y < lm[11].y && lm[16].y < lm[12].y && Math.abs(lm[15].x - lm[16].x) > 0.3;
+    },
+    'L-SHAPE': (lm) => {
+        // 左水平右垂直，或反之
+        const leftH = isHorizontal(lm[11], lm[15]) && getAngle(lm[11], lm[13], lm[15]) > 160;
+        const rightV = isVertical(lm[12], lm[16]) && lm[16].y < lm[12].y && getAngle(lm[12], lm[14], lm[16]) > 160;
+        const rightH = isHorizontal(lm[12], lm[16]) && getAngle(lm[12], lm[14], lm[16]) > 160;
+        const leftV = isVertical(lm[11], lm[15]) && lm[15].y < lm[11].y && getAngle(lm[11], lm[13], lm[15]) > 160;
+        return (leftH && rightV) || (rightH && leftV);
+    },
+    'ARCHER': (lm) => {
+        // 一臂伸直，一臂拉弓（手靠近肩/脸）
+        const leftStraight = getAngle(lm[11], lm[13], lm[15]) > 160;
+        const rightBent = getAngle(lm[12], lm[14], lm[16]) < 90 && Math.abs(lm[16].x - lm[12].x) < 0.15;
+        const rightStraight = getAngle(lm[12], lm[14], lm[16]) > 160;
+        const leftBent = getAngle(lm[11], lm[13], lm[15]) < 90 && Math.abs(lm[15].x - lm[11].x) < 0.15;
+        return (leftStraight && rightBent) || (rightStraight && leftBent);
+    },
+    'FLEX': (lm) => {
+        // 双臂弯曲展示肌肉，大臂水平
+        return getAngle(lm[11], lm[13], lm[15]) < 90 && getAngle(lm[12], lm[14], lm[16]) < 90 && isHorizontal(lm[11], lm[13]) && isHorizontal(lm[12], lm[14]);
+    },
+    'CROSS': (lm) => {
+        // 双臂在胸前交叉
+        return Math.abs(lm[15].x - lm[16].x) < 0.1 && lm[15].y > lm[11].y && lm[16].y > lm[12].y;
+    },
+    'ZEN': (lm) => {
+        // 双手合十放在胸前/腹部
+        const handDist = Math.hypot(lm[15].x - lm[16].x, lm[15].y - lm[16].y);
+        return handDist < 0.08 && lm[15].y > lm[11].y && lm[16].y > lm[12].y;
+    },
+    'DAB': (lm) => {
+        // 一个简单版本的Dab判定
+        const leftDab = getAngle(lm[11], lm[13], lm[15]) < 60 && getAngle(lm[12], lm[14], lm[16]) > 150 && lm[15].y < lm[11].y && lm[16].y < lm[12].y;
+        const rightDab = getAngle(lm[12], lm[14], lm[16]) < 60 && getAngle(lm[11], lm[13], lm[15]) > 150 && lm[16].y < lm[12].y && lm[15].y < lm[11].y;
+        return leftDab || rightDab;
+    }
 };
 const POSE_KEYS = Object.keys(PoseLogic);
+const POSE_ICONS = { 'T-POSE': '✈️', 'V-SHAPE': '✌️', 'L-SHAPE': '📐', 'ARCHER': '🏹', 'FLEX': '💪', 'CROSS': '🙅', 'ZEN': '🙏', 'DAB': '🕺' };
+
 
 // ========================
-// 3. 3D 场景渲染
+// 3. 3D 场景与视觉 (Synthwave Style)
 // ========================
-let scene, camera, renderer, composer, wall, currentTarget = 'T-POSE';
-let score = 0, combo = 0, speed = 0.4;
+let scene, camera, renderer, composer;
+let wall, wallIcon, particleSystem;
+let currentTarget = null;
+let score = 0, combo = 0, gameSpeed = 0.3;
+let isGameActive = false;
 
 function init3D() {
     scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a001a, 0.02); // 深紫色迷雾
+
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    camera.position.set(0, 2, 10);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
-    // 霓虹效果
+    // --- Post-Processing (Bloom) ---
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.0, 0.5, 0.9);
+    composer.addPass(bloomPass);
 
-    // 隧道
-    const grid = new THREE.GridHelper(200, 50, 0x00f2ff, 0x004455);
-    grid.rotation.x = Math.PI/2;
-    scene.add(grid);
+    // --- Environment (Tunnel) ---
+    createSynthwaveEnvironment();
 
-    spawnWall();
-    camera.position.z = 10;
-    camera.position.y = 2;
+    // --- Lights ---
+    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    scene.add(ambientLight);
+    const pointLight = new THREE.PointLight(0x00f2ff, 2, 50);
+    pointLight.position.set(0, 5, 5);
+    scene.add(pointLight);
+
+    // --- Particle System (for Wall Explosion) ---
+    createParticleSystem();
+
+    window.addEventListener('resize', onWindowResize);
 }
+
+function createSynthwaveEnvironment() {
+    // Grid Floor (Moving)
+    const gridGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+    const gridMat = new THREE.MeshBasicMaterial({ 
+        color: 0xff00ff, 
+        wireframe: true, 
+        transparent: true, 
+        opacity: 0.3,
+        side: THREE.DoubleSide
+    });
+    const floor = new THREE.Mesh(gridGeo, gridMat);
+    floor.rotation.x = Math.PI / 2;
+    floor.position.y = -2;
+    scene.add(floor);
+    floor.userData.isFloor = true; // 标记用于动画
+
+    // Tunnel Walls (Simple Lines for now)
+    // ... (可以进一步添加两侧的线条结构增强透视感)
+}
+
+function createParticleSystem() {
+    const particleCount = 1000;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(particleCount * 3);
+    const vel = new Float32Array(particleCount * 3); // 速度
+    const life = new Float32Array(particleCount); // 生命周期
+
+    for(let i=0; i<particleCount; i++) {
+        pos[i*3] = 0; pos[i*3+1] = 0; pos[i*3+2] = 0;
+        life[i] = 0; // 初始不显示
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('velocity', new THREE.BufferAttribute(vel, 3));
+    geo.setAttribute('life', new THREE.BufferAttribute(life, 1));
+
+    const mat = new THREE.PointsMaterial({
+        size: 0.2,
+        color: 0x00f2ff,
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    particleSystem = new THREE.Points(geo, mat);
+    scene.add(particleSystem);
+}
+
+function explodeWall(position) {
+    const positions = particleSystem.geometry.attributes.position.array;
+    const velocities = particleSystem.geometry.attributes.velocity.array;
+    const lives = particleSystem.geometry.attributes.life.array;
+
+    for(let i=0; i<lives.length; i++) {
+        if (lives[i] <= 0) { // 找到空闲粒子
+            positions[i*3] = position.x + (Math.random()-0.5)*10;
+            positions[i*3+1] = position.y + (Math.random()-0.5)*10;
+            positions[i*3+2] = position.z;
+            
+            velocities[i*3] = (Math.random()-0.5) * 2;
+            velocities[i*3+1] = (Math.random()-0.5) * 2;
+            velocities[i*3+2] = Math.random() * 2 + 1; // 向前飞散
+
+            lives[i] = 1.0; // 激活
+        }
+    }
+    particleSystem.geometry.attributes.position.needsUpdate = true;
+    particleSystem.geometry.attributes.velocity.needsUpdate = true;
+    particleSystem.geometry.attributes.life.needsUpdate = true;
+}
+
+function updateParticles() {
+    const positions = particleSystem.geometry.attributes.position.array;
+    const velocities = particleSystem.geometry.attributes.velocity.array;
+    const lives = particleSystem.geometry.attributes.life.array;
+    let activeCount = 0;
+
+    for(let i=0; i<lives.length; i++) {
+        if (lives[i] > 0) {
+            positions[i*3] += velocities[i*3];
+            positions[i*3+1] += velocities[i*3+1];
+            positions[i*3+2] += velocities[i*3+2];
+            lives[i] -= 0.02; // 衰减
+            activeCount++;
+        }
+    }
+    if (activeCount > 0) {
+        particleSystem.geometry.attributes.position.needsUpdate = true;
+        particleSystem.geometry.attributes.life.needsUpdate = true;
+    }
+}
+
 
 function spawnWall() {
     if(wall) scene.remove(wall);
+
+    // Neon Wall Geometry
     const geo = new THREE.BoxGeometry(12, 12, 0.5);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.5 });
-    wall = new THREE.Mesh(geo, mat);
-    wall.position.z = -100;
-    scene.add(wall);
+    // 使用 ShaderMaterial 可以实现更复杂的霓虹边缘和透明效果，这里先用基础材质模拟
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: 0x000000,
+        emissive: 0x00f2ff,
+        emissiveIntensity: 0.5,
+        transparent: true, 
+        opacity: 0.8,
+        side: THREE.DoubleSide
+    });
+    // 添加霓虹线框
+    const edges = new THREE.EdgesGeometry(geo);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00f2ff, linewidth: 2 });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
     
+    wall = new THREE.Mesh(geo, mat);
+    wall.add(wireframe);
+    wall.position.z = -100;
+    wall.position.y = 2;
+
+    // Add Pose Icon Text
     currentTarget = POSE_KEYS[Math.floor(Math.random()*POSE_KEYS.length)];
+    
+    // 更新 UI 提示
     document.getElementById('pose-name').innerText = currentTarget;
-    AudioSys.play(200, 'sine', 0.1);
+    document.getElementById('pose-icon-hint').innerText = POSE_ICONS[currentTarget];
+    
+    scene.add(wall);
+    wall.userData = { processed: false, pose: currentTarget };
+    AudioSys.play('spawn');
 }
 
 // ========================
-// 4. AI 姿态识别接入
+// 4. 游戏逻辑与 UI 更新
 // ========================
-const videoElement = document.getElementById('input_video');
-const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
-
-pose.onResults((results) => {
-    document.getElementById('loading').style.display = 'none';
-    if (!results.poseLandmarks) return;
-    
-    const isMatched = PoseLogic[currentTarget](results.poseLandmarks);
-    
-    if (wall.position.z > 5 && wall.position.z < 8) {
-        if (isMatched) handleSuccess();
-        else handleFail();
-    }
-});
-
 function handleSuccess() {
     if(wall.userData.processed) return;
     wall.userData.processed = true;
-    score += 100 * (combo + 1);
+    
+    const points = 300 * (combo + 1);
+    score += points;
     combo++;
-    updateUI('PERFECT', '#00f2ff');
-    AudioSys.play(880, 'square', 0.1);
-    spawnWall();
+    
+    explodeWall(wall.position); // 触发粒子特效
+    scene.remove(wall); // 移除墙体
+
+    updateUI('GREAT!', `+${points}`, 'great');
+    AudioSys.play('success');
+    
+    // 增加难度（速度）
+    gameSpeed = Math.min(gameSpeed + 0.02, 1.0);
+    updateDifficultyUI();
+
+    setTimeout(spawnWall, 1000);
 }
 
 function handleFail() {
     if(wall.userData.processed) return;
     wall.userData.processed = true;
+    
     combo = 0;
-    updateUI('MISS', '#ff0055');
-    AudioSys.play(110, 'sawtooth', 0.3);
-    spawnWall();
+    // 屏幕震动效果 (通过 CSS)
+    document.body.style.animation = 'shake 0.5s';
+    setTimeout(() => document.body.style.animation = '', 500);
+
+    updateUI('FAIL!', 'MISS', 'miss');
+    AudioSys.play('fail');
+    
+    // 重置速度
+    gameSpeed = 0.3;
+    updateDifficultyUI();
+
+    setTimeout(spawnWall, 1500);
 }
 
-function updateUI(text, color) {
-    const hint = document.getElementById('hint-text');
-    hint.innerText = text;
-    hint.style.color = color;
-    hint.style.opacity = 1;
-    setTimeout(() => hint.style.opacity = 0, 500);
-    document.getElementById('score').innerText = score;
-    document.getElementById('combo').innerText = "COMBO: " + combo;
+function updateUI(mainText, subText, type) {
+    const popup = document.getElementById('feedback-popup');
+    const main = document.getElementById('feedback-main');
+    const sub = document.getElementById('feedback-sub');
+    
+    main.innerText = mainText;
+    sub.innerText = subText;
+    
+    popup.className = ''; // 清除之前的类
+    popup.classList.add(type);
+    
+    // 自动隐藏
+    setTimeout(() => {
+        popup.classList.remove(type);
+    }, 1000);
+
+    // 更新分数和连击栏
+    const scoreVal = document.getElementById('score-val');
+    const comboVal = document.getElementById('combo-val');
+    
+    // 数字跳动动画
+    scoreVal.style.transform = 'scale(1.2)';
+    setTimeout(() => scoreVal.style.transform = 'scale(1)', 200);
+    scoreVal.innerText = score;
+
+    comboVal.innerText = 'x' + combo;
+    comboVal.style.color = combo > 5 ? '#ffeb3b' : (combo > 2 ? '#ff00ff' : '#00f2ff');
 }
+
+function updateDifficultyUI() {
+    const steps = document.querySelectorAll('.diff-step');
+    steps.forEach(s => s.classList.remove('active'));
+    
+    let activeIndex = 0;
+    if (gameSpeed > 0.4) activeIndex = 1;
+    if (gameSpeed > 0.6) activeIndex = 2;
+    if (gameSpeed > 0.8) activeIndex = 3;
+    
+    steps[activeIndex].classList.add('active');
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ========================
+// 5. MediaPipe & 主循环
+// ========================
+const videoElement = document.getElementById('input_video');
+const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+pose.onResults((results) => {
+    if (!isGameActive) {
+        document.getElementById('loading-screen').style.display = 'none';
+        isGameActive = true;
+        spawnWall();
+    }
+    if (!results.poseLandmarks || !wall || wall.userData.processed) return;
+    
+    // 核心判定逻辑
+    const isMatched = PoseLogic[wall.userData.pose](results.poseLandmarks);
+    
+    // 判定区域（当墙体靠近相机时）
+    if (wall.position.z > 4 && wall.position.z < 7) {
+        if (isMatched) handleSuccess();
+    }
+});
 
 const camera_mp = new Camera(videoElement, {
     onFrame: async () => { await pose.send({image: videoElement}); },
     width: 640, height: 480
 });
-camera_mp.start();
 
-// 循环
 function animate() {
     requestAnimationFrame(animate);
-    if(wall) {
-        wall.position.z += speed;
-        if(wall.position.z > 15) spawnWall();
+    
+    if (isGameActive && wall && !wall.userData.processed) {
+        wall.position.z += gameSpeed;
+        
+        // 移动地面网格制造速度感
+        scene.children.forEach(child => {
+            if(child.userData.isFloor) {
+                child.position.z += gameSpeed;
+                if(child.position.z > 10) child.position.z = 0; // 循环
+            }
+        });
+
+        // 穿过相机未匹配则失败
+        if (wall.position.z > 8) {
+            handleFail();
+        }
     }
+    
+    updateParticles();
     composer.render();
 }
 
 init3D();
+camera_mp.start(); // 启动摄像头后开始游戏循环
 animate();
 </script>
 </body>
