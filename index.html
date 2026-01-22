@@ -3,56 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: Speed Rush</title>
+    <title>Pose Master: 60s Challenge</title>
     <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --ui-blue: #009dff;
-            --ui-gold: #ffcc00;
-            --ui-red: #ff3344;
-        }
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Luckiest Guy', cursive; }
+        :root { --ui-blue: #009dff; --ui-gold: #ffcc00; --ui-red: #ff3344; }
+        body { margin: 0; background: #050510; overflow: hidden; font-family: 'Luckiest Guy', cursive; color: white; }
         
-        /* --- 3D 卡通 HUD --- */
+        /* --- UI Overlay --- */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-
-        /* 顶部难度条 */
-        #diff-container { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
-        .diff-tab { 
-            padding: 8px 25px; background: #222; color: #fff; border-radius: 5px; 
-            font-size: 1.2rem; transform: skewX(-15deg); border: 2px solid #444; transition: 0.3s;
-        }
-        .diff-tab.active { background: var(--ui-red); border-color: #fff; box-shadow: 0 0 15px var(--ui-red); }
-        .diff-tab:nth-child(2).active { background: var(--ui-gold); }
-        .diff-tab:nth-child(3).active { background: #6600ff; }
-        .diff-tab:nth-child(4).active { background: #000; color: var(--ui-red); border-color: var(--ui-red); }
-
-        /* 左下角：火焰连击 */
-        #combo-panel { position: absolute; bottom: 30px; left: 40px; }
-        #flame-icon { font-size: 3rem; display: block; animation: fire-shake 0.2s infinite; }
-        #combo-text { font-size: 2.5rem; color: #fff; text-shadow: 0 0 10px var(--ui-gold); }
-        #combo-bar { width: 150px; height: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; margin-top: 5px; overflow: hidden; }
-        #combo-fill { width: 0%; height: 100%; background: linear-gradient(to right, var(--ui-gold), #ff5500); transition: 0.2s; }
-
-        /* 右下角：星星分数 */
-        #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
-        #score-val { font-size: 3.5rem; color: var(--ui-gold); -webkit-text-stroke: 2px #332200; }
-        #walls-passed { color: #00f2ff; font-size: 1.2rem; }
-
-        /* 中间反馈 */
-        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5); font-size: 6rem; color: #fff; text-shadow: 0 0 20px var(--ui-blue); opacity: 0; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-
-        /* 摄像头小窗 */
-        #video-container { position: absolute; top: 20px; right: 20px; width: 160px; height: 120px; border: 4px solid var(--ui-blue); border-radius: 10px; overflow: hidden; transform: scaleX(-1); }
         
-        @keyframes fire-shake { 0% { transform: rotate(-5deg); } 100% { transform: rotate(5deg); } }
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; color: var(--ui-blue); font-size: 2rem; }
+        /* 倒计时面板 */
+        #timer-panel { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); text-align: center; }
+        #timer-val { font-size: 4rem; color: #fff; text-shadow: 0 0 20px var(--ui-blue); }
+        #timer-label { font-size: 1rem; letter-spacing: 5px; color: var(--ui-blue); }
+
+        #diff-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .diff-tab { padding: 5px 20px; background: #222; border-radius: 5px; font-size: 1rem; transform: skewX(-15deg); border: 1px solid #444; opacity: 0.5; }
+        .diff-tab.active { opacity: 1; background: var(--ui-red); border-color: #fff; box-shadow: 0 0 15px var(--ui-red); }
+        
+        #combo-panel { position: absolute; bottom: 30px; left: 40px; }
+        #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
+        #score-val { font-size: 3.5rem; color: var(--ui-gold); }
+
+        /* 结算界面 */
+        #game-over { 
+            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); 
+            z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; 
+            backdrop-filter: blur(10px);
+        }
+        .result-card { text-align: center; padding: 40px; border: 4px solid var(--ui-gold); border-radius: 20px; background: #111; }
+        .restart-btn { 
+            margin-top: 30px; padding: 15px 40px; background: var(--ui-blue); color: #fff; 
+            border: none; border-radius: 50px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; pointer-events: auto;
+        }
+
+        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5); font-size: 6rem; opacity: 0; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+
+        #video-container { position: absolute; top: 20px; right: 20px; width: 160px; height: 120px; border: 3px solid var(--ui-blue); border-radius: 10px; overflow: hidden; transform: scaleX(-1); opacity: 0.8; }
+        
+        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-<div id="loading">SYTEM LOADING...</div>
+<div id="game-over">
+    <div class="result-card">
+        <h1 style="color: var(--ui-red); font-size: 4rem; margin: 0;">TIME UP!</h1>
+        <p style="font-size: 2rem; margin: 20px 0;">FINAL SCORE: <span id="final-score" style="color: var(--ui-gold);">0</span></p>
+        <p style="font-size: 1.5rem; opacity: 0.8;">MAX COMBO: <span id="max-combo">0</span></p>
+        <button class="restart-btn" onclick="location.reload()">RETRY CHALLENGE</button>
+    </div>
+</div>
+
+<div id="loading">
+    <div id="status">INITIALIZING AI...</div>
+    <p style="font-size: 1rem; margin-top: 20px;">请确保光线充足并允许摄像头权限</p>
+</div>
 
 <div id="ui-layer">
     <div id="diff-container">
@@ -62,25 +69,30 @@
         <div class="diff-tab">EXTREME</div>
     </div>
 
+    <div id="timer-panel">
+        <div id="timer-val">60</div>
+        <div id="timer-label">SECONDS LEFT</div>
+    </div>
+
     <div id="combo-panel">
-        <span id="flame-icon">🔥</span>
-        <div id="combo-text">COMBO X <span id="combo">0</span></div>
-        <div id="combo-bar"><div id="combo-fill"></div></div>
+        <span style="font-size: 3rem;">🔥</span>
+        <div style="font-size: 2.5rem;">COMBO X <span id="combo-num">0</span></div>
     </div>
 
     <div id="score-panel">
         <div id="score-val">★ 0000</div>
-        <div id="walls-passed">WALLS PASSED: 0</div>
+        <div style="color: var(--ui-blue);">SPEED: <span id="speed-indicator">1.0</span>x</div>
     </div>
-
+    
     <div id="flash-msg">GREAT!</div>
 </div>
 
-<div id="video-container"><video id="video-feed" style="width:100%"></video></div>
+<div id="video-container"><video id="input_video" style="width:100%; height:100%; object-fit: cover;"></video></div>
 <div id="game-canvas"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
 <script type="importmap">
 {
     "imports": {
@@ -96,163 +108,148 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// --- 配置与姿态 ---
-const POSES = ['T-POSE', 'V-SHAPE', 'L-LEFT', 'L-RIGHT', 'FLEX', 'ARCHER', 'ZEN', 'DAB'];
-const getPoseTexture = (name) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 400px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('👤', 256, 256); // 简单占位，实际可换为 Stickman
-    return new THREE.CanvasTexture(canvas);
+// --- 姿态定义 ---
+const getAngle = (p1, p2) => Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+const PoseValidators = {
+    'T-POSE': (lm) => Math.abs(getAngle(lm[11], lm[15])) < 25 && Math.abs(getAngle(lm[12], lm[16])) > 155,
+    'V-SHAPE': (lm) => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
+    'FLEX': (lm) => lm[15].y < lm[13].y && lm[16].y < lm[14].y,
+    'ZEN': (lm) => Math.hypot(lm[15].x-lm[16].x, lm[15].y-lm[16].y) < 0.15
 };
+const POSES = Object.keys(PoseValidators);
 
-// --- 3D 引擎 ---
-let scene, camera, renderer, composer, wall, speedLineTunnel;
-let score = 0, combo = 0, gameSpeed = 0.6, wallsPassed = 0;
-let currentPose = 'T-POSE';
+// --- 游戏变量 ---
+let scene, camera, renderer, composer, wall, tunnel;
+let score = 0, combo = 0, maxCombo = 0, gameSpeed = 0.6, isHit = false;
+let timeLeft = 60, isGameOver = false, gameStarted = false;
+let currentPoseKey = 'T-POSE';
 
-function init() {
+async function init3D() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050510);
+    scene.fog = new THREE.FogExp2(0x050510, 0.05);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('game-canvas').appendChild(renderer.domElement);
 
-    // 辉光
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.0, 0.4, 0.85));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.85));
 
-    // 速度线隧道
-    createSpeedTunnel();
-    
+    const tunnelGeo = new THREE.CylinderGeometry(15, 15, 300, 32, 1, true);
+    const tunnelMat = new THREE.MeshBasicMaterial({ color: 0x0066ff, wireframe: true, transparent: true, opacity: 0.1, side: THREE.BackSide });
+    tunnel = new THREE.Mesh(tunnelGeo, tunnelMat);
+    tunnel.rotation.x = Math.PI / 2;
+    scene.add(tunnel);
+
+    camera.position.set(0, 1.8, 8);
     spawnWall();
-    camera.position.set(0, 1.6, 8);
-    animate();
-}
-
-function createSpeedTunnel() {
-    const geometry = new THREE.CylinderGeometry(15, 15, 200, 32, 1, true);
-    const material = new THREE.MeshBasicMaterial({
-        color: 0x0044ff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.2,
-        side: THREE.BackSide
-    });
-    speedLineTunnel = new THREE.Mesh(geometry, material);
-    speedLineTunnel.rotation.x = Math.PI / 2;
-    scene.add(speedLineTunnel);
 }
 
 function spawnWall() {
     if(wall) scene.remove(wall);
-    currentPose = POSES[Math.floor(Math.random() * POSES.length)];
-    
-    const wallGeo = new THREE.BoxGeometry(10, 10, 0.5);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x0088ff, emissive: 0x0044ff });
-    wall = new THREE.Mesh(wallGeo, wallMat);
-    
-    // 挖空剪影（纹理贴图模拟）
-    const silGeo = new THREE.PlaneGeometry(6, 6);
-    const silMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-    const silhouette = new THREE.Mesh(silGeo, silMat);
-    silhouette.position.z = 0.3;
-    wall.add(silhouette);
-
-    wall.position.z = -100;
+    currentPoseKey = POSES[Math.floor(Math.random() * POSES.length)];
+    const group = new THREE.Group();
+    const wallGeo = new THREE.BoxGeometry(12, 12, 0.2);
+    const wallMat = new THREE.MeshPhongMaterial({ color: 0x0088ff, transparent: true, opacity: 0.4 });
+    const silMesh = new THREE.Mesh(new THREE.PlaneGeometry(6,6), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true}));
+    silMesh.position.z = 0.15;
+    group.add(new THREE.Mesh(wallGeo, wallMat), silMesh);
+    group.position.z = -120;
+    wall = group; isHit = false;
     scene.add(wall);
 }
 
-// --- 游戏循环 ---
-function animate() {
-    requestAnimationFrame(animate);
-    
-    // 隧道旋转与前进感
-    if(speedLineTunnel) {
-        speedLineTunnel.rotation.y += 0.01;
-        speedLineTunnel.position.z += gameSpeed * 2;
-        if(speedLineTunnel.position.z > 50) speedLineTunnel.position.z = 0;
-    }
-
-    if(wall) {
-        wall.position.z += gameSpeed;
-        if(wall.position.z > 10) handleResult(false);
-    }
-
-    composer.render();
+function startTimer() {
+    const timer = setInterval(() => {
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            endGame();
+        } else {
+            timeLeft--;
+            document.getElementById('timer-val').innerText = timeLeft;
+            if (timeLeft < 10) document.getElementById('timer-val').style.color = "var(--ui-red)";
+        }
+    }, 1000);
 }
 
-// --- AI 判定 ---
-const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-pose.onResults(res => {
-    document.getElementById('loading').style.display = 'none';
-    if(!res.poseLandmarks || !wall || wall.userData.hit) return;
-    
-    // 简易逻辑判定：距离相机 3-7 米时扫描
-    if(wall.position.z > 3 && wall.position.z < 7) {
-        // 这里调用你之前的算法 PoseValidators[currentPose]
-        // 假设通过：
-        if(Math.random() > 0.98) handleResult(true); 
-    }
-});
+function endGame() {
+    isGameOver = true;
+    document.getElementById('game-over').style.display = 'flex';
+    document.getElementById('final-score').innerText = score;
+    document.getElementById('max-combo').innerText = maxCombo;
+}
 
-function handleResult(success) {
-    if(wall.userData.hit) return;
-    wall.userData.hit = true;
-
+function triggerResult(success) {
+    if (isHit || isGameOver) return;
+    isHit = true;
     const msg = document.getElementById('flash-msg');
     if(success) {
-        score += 300 + (combo * 50);
-        combo++;
-        wallsPassed++;
-        msg.innerText = "GREAT! +300";
-        msg.classList.add('show');
-        gameSpeed += 0.01; // 越来越快
+        score += 300; combo++;
+        if(combo > maxCombo) maxCombo = combo;
+        timeLeft += 2; // PERFECT 奖励 2 秒
+        msg.innerText = "GREAT! +2s";
+        msg.style.color = "var(--ui-gold)";
+        gameSpeed += 0.01;
     } else {
         combo = 0;
         msg.innerText = "MISS!";
-        msg.style.color = "#ff3344";
-        msg.classList.add('show');
+        msg.style.color = "var(--ui-red)";
         gameSpeed = 0.6;
     }
-
-    // 更新 UI
-    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
-    document.getElementById('combo').innerText = combo;
-    document.getElementById('combo-fill').style.width = Math.min(combo * 10, 100) + "%";
-    document.getElementById('walls-passed').innerText = "WALLS PASSED: " + wallsPassed;
-    
-    updateDiffTabs();
-
-    setTimeout(() => {
-        msg.classList.remove('show');
-        msg.style.color = "#fff";
-        spawnWall();
-    }, 600);
+    msg.classList.add('show');
+    updateUI();
+    setTimeout(() => { msg.classList.remove('show'); spawnWall(); }, 600);
 }
 
-function updateDiffTabs() {
+function updateUI() {
+    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
+    document.getElementById('combo-num').innerText = combo;
+    document.getElementById('speed-indicator').innerText = (gameSpeed/0.6).toFixed(1);
     const tabs = document.querySelectorAll('.diff-tab');
     tabs.forEach(t => t.classList.remove('active'));
-    if(gameSpeed < 0.8) tabs[0].classList.add('active');
-    else if(gameSpeed < 1.1) tabs[1].classList.add('active');
-    else if(gameSpeed < 1.4) tabs[2].classList.add('active');
-    else tabs[3].classList.add('active');
+    const idx = Math.min(Math.floor((gameSpeed - 0.6) / 0.3), 3);
+    tabs[idx].classList.add('active');
 }
 
-const cam = new Camera(document.getElementById('video-feed'), {
-    onFrame: async () => { await pose.send({image: document.getElementById('video-feed')}); },
-    width: 640, height: 480
-});
-cam.start();
-init();
+async function setupAI() {
+    const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+    pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.5 });
+    pose.onResults((results) => {
+        if (!results.poseLandmarks || isGameOver) return;
+        if (!gameStarted) {
+            gameStarted = true;
+            document.getElementById('loading').style.display = 'none';
+            startTimer();
+        }
+        if (isHit) return;
+        const matched = PoseValidators[currentPoseKey](results.poseLandmarks);
+        if (wall.position.z > 3 && wall.position.z < 7.5 && matched) triggerResult(true);
+    });
+
+    const cam = new Camera(document.getElementById('input_video'), {
+        onFrame: async () => { await pose.send({image: document.getElementById('input_video')}); },
+        width: 640, height: 480
+    });
+    cam.start();
+}
+
+function animate() {
+    if (isGameOver) return;
+    requestAnimationFrame(animate);
+    if(tunnel) {
+        tunnel.rotation.y += 0.01;
+        tunnel.position.z += gameSpeed * 2;
+        if(tunnel.position.z > 100) tunnel.position.z = 0;
+    }
+    if(wall) {
+        wall.position.z += gameSpeed;
+        if(wall.position.z > 10 && !isHit) triggerResult(false);
+    }
+    composer.render();
+}
+
+window.onload = () => { init3D(); setupAI(); animate(); };
 </script>
 </body>
 </html>
