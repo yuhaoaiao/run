@@ -2,233 +2,462 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: Concrete Ghost Edition</title>
-    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Luxe Velvet Lipstick - Virtual Try-On</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root { --ui-blue: #00f2ff; --ui-gold: #ffcc00; --ui-red: #ff3344; }
-        body { margin: 0; background: #020508; overflow: hidden; font-family: 'Luckiest Guy', cursive; color: white; }
-        
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        #timer-panel { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); text-align: center; }
-        #timer-val { font-size: 4rem; text-shadow: 0 0 20px var(--ui-blue); }
-        #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
-        #score-val { font-size: 3.5rem; color: var(--ui-gold); }
+        :root {
+            --primary: #000;
+            --accent: #fff;
+            --bg-dark: #121212;
+            --glass-bg: rgba(20, 20, 20, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            margin: 0;
+            background: var(--bg-dark);
+            color: var(--accent);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-        /* 摄像头画中画 - 赛博边框 */
-        #video-container { 
-            position: absolute; top: 20px; right: 20px; width: 200px; height: 150px; 
-            border: 2px solid var(--ui-blue); border-radius: 8px; overflow: hidden; 
-            transform: scaleX(-1); box-shadow: 0 0 15px var(--ui-blue); opacity: 0.8;
+        /* --- 1. 顶部导航栏 --- */
+        .app-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            z-index: 100;
+        }
+        .header-btn { font-size: 24px; color: #fff; cursor: pointer; }
+        .header-title { font-size: 18px; font-weight: 600; }
+
+        /* --- 2. 视频视图区域 (核心) --- */
+        .viewport {
+            position: relative;
+            flex: 1;
+            width: 100%;
             background: #000;
+            overflow: hidden;
         }
-        #input_video { width: 100%; height: 100%; object-fit: cover; }
-
-        #game-over { 
-            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); 
-            z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; 
-            backdrop-filter: blur(15px);
+        /* 原始视频层 (用于对比) */
+        #originalVideo {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 1;
         }
-        .restart-btn { margin-top: 20px; padding: 12px 30px; background: var(--ui-blue); border: none; border-radius: 30px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; pointer-events: auto; }
+        /* 试妆 Canvas 层 */
+        #trialCanvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 2;
+            /* 默认全屏显示 */
+            clip-path: inset(0 0 0 0); 
+            transition: clip-path 0.2s ease-out;
+        }
+        /* 对比时的分割线 */
+        .split-line {
+            position: absolute;
+            top: 0; bottom: 0; left: 50%;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 3;
+            display: none; /* 默认隐藏 */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
 
-        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; opacity: 0; transition: 0.3s; }
-        #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; color: var(--ui-blue); }
+        /* 加载动画 */
+        .loader {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .spinner {
+            width: 30px; height: 30px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- 3. 底部控制面板 --- */
+        .controls-container {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 20px;
+            background: linear-gradient(to top, rgba(0,0,0,1) 20%, transparent);
+        }
+
+        /* 悬浮功能按钮 (Texture, Compare) */
+        .floating-actions {
+            display: flex;
+            gap: 80px;
+            margin-bottom: 25px;
+        }
+        .float-btn {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            color: #fff;
+            border: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+        .float-btn:active { background: rgba(255, 255, 255, 0.4); transform: scale(0.95); }
+        .float-btn i { font-size: 20px; margin-bottom: 2px; }
+
+        /* 色号选择栏 */
+        .swatch-bar {
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 20px;
+            margin-bottom: 15px;
+            -webkit-overflow-scrolling: touch;
+            /* 隐藏滚动条 */
+            scrollbar-width: none; 
+        }
+        .swatch-bar::-webkit-scrollbar { display: none; }
+
+        .swatch {
+            display: inline-block;
+            width: 48px; height: 48px;
+            border-radius: 12px; /* 圆角矩形 */
+            margin-right: 12px;
+            background-color: #ddd;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .swatch.active {
+            border-color: #fff;
+            transform: scale(1.1);
+        }
+
+        /* 底部固定按钮 */
+        .bottom-action-bar {
+            width: 90%;
+            max-width: 400px;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            border-radius: 30px;
+            background: var(--primary);
+            color: var(--accent);
+            border: none;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        /* --- 4. 分享模态窗口 (模拟图4) --- */
+        .share-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark);
+            z-index: 200;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 20px;
+            display: flex; justify-content: flex-end;
+        }
+        .snapshot-container {
+            flex: 1;
+            display: flex; justify-content: center; align-items: center;
+            padding: 20px;
+        }
+        #snapshotImg {
+            max-width: 100%; max-height: 80%;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal-footer {
+            padding: 30px 20px;
+            display: flex; flex-direction: column; align-items: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-radius: 30px 30px 0 0;
+        }
+        .share-icons { display: flex; gap: 30px; margin-bottom: 30px; }
+        .share-icon-item { display: flex; flex-direction: column; align-items: center; color: #fff; }
+        .share-icon-btn {
+            width: 60px; height: 60px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 30px; margin-bottom: 8px;
+        }
+
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-<div id="loading">POSE SENSORS INITIALIZING...</div>
-
-<div id="game-over">
-    <div style="text-align: center; border: 4px solid var(--ui-blue); padding: 40px; border-radius: 20px; background: #000;">
-        <h1 style="color: var(--ui-red); font-size: 3rem;">TIME'S UP!</h1>
-        <p style="font-size: 2rem;">FINAL SCORE: <span id="final-score" style="color: var(--ui-gold);">0</span></p>
-        <button class="restart-btn" onclick="location.reload()">RETRY CHALLENGE</button>
+    <div class="app-header">
+        <i class="bi bi-chevron-left header-btn" onclick="history.back()"></i>
+        <div class="header-title">商品详情</div>
+        <div style="display: flex; gap: 15px;">
+            <i class="bi bi-three-dots header-btn"></i>
+            <i class="bi bi-x-lg header-btn" onclick="location.reload()"></i>
+        </div>
     </div>
-</div>
 
-<div id="ui-layer">
-    <div id="timer-panel">
-        <div id="timer-val">60</div>
-        <div style="font-size: 1rem; letter-spacing: 5px; color: var(--ui-blue);">SECONDS LEFT</div>
+    <div class="viewport">
+        <video id="originalVideo" playsinline></video>
+        <canvas id="trialCanvas"></canvas>
+        <div class="split-line" id="splitLine"></div>
+
+        <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <span>正在开启摄像头...</span>
+        </div>
     </div>
-    <div id="score-panel">
-        <div id="score-val">★ 0000</div>
-        <div id="combo-text" style="color: var(--ui-blue);">COMBO X 0</div>
+
+    <div class="controls-container" id="controlsUI">
+        <div class="floating-actions">
+            <div class="float-btn" onclick="toggleTexture()">
+                <i class="bi bi-palette"></i>
+                <span>Texture</span>
+            </div>
+            <div class="float-btn" id="compareBtn">
+                <i class="bi bi-layout-split"></i>
+                <span>对比</span>
+            </div>
+        </div>
+
+        <div class="swatch-bar">
+            <div class="swatch active" style="background: #9b1c31;" data-color="155, 28, 49"></div>
+            <div class="swatch" style="background: #d15c5c;" data-color="209, 92, 92"></div>
+            <div class="swatch" style="background: #8e44ad;" data-color="142, 68, 173"></div>
+            <div class="swatch" style="background: #e67e22;" data-color="230, 126, 34"></div>
+            <div class="swatch" style="background: #ff9ff3;" data-color="255, 159, 243"></div>
+            <div class="swatch" style="background: #571717;" data-color="87, 23, 23"></div>
+        </div>
+
+        <div class="bottom-action-bar" style="display: flex; gap: 10px;">
+             <button class="btn-primary" style="background: #333; flex: 1;" onclick="takeSnapshot()">拍照</button>
+             <button class="btn-primary" style="flex: 2;" onclick="alert('已加入购物车：' + config.color)">Add to Cart</button>
+        </div>
     </div>
-    <div id="flash-msg">PERFECT</div>
-</div>
 
-<div id="video-container">
-    <video id="input_video" playsinline></video>
-</div>
+    <div class="share-modal" id="shareModal">
+        <div class="modal-header">
+            <i class="bi bi-x-lg header-btn" style="color:#333; background:rgba(255,255,255,0.8); padding:5px; border-radius:50%;" onclick="closeShareModal()"></i>
+        </div>
+        <div class="snapshot-container">
+            <img id="snapshotImg" src="" alt="试妆快照">
+        </div>
+        <div class="modal-footer">
+            <div class="share-icons">
+                <div class="share-icon-item">
+                    <div class="share-icon-btn" style="background: #07c160;"><i class="bi bi-wechat"></i></div>
+                    <span>WeChat</span>
+                </div>
+                <div class="share-icon-item">
+                    <div class="share-icon-btn" style="background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);"><i class="bi bi-instagram"></i></div>
+                    <span>Instagram</span>
+                </div>
+            </div>
+            <button class="btn-primary" style="width: 90%; max-width: 400px;" onclick="alert('跳转结算流程')">Add to Cart</button>
+        </div>
+    </div>
 
-<div id="game-canvas"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script type="importmap">
-{
-    "imports": {
-        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
-    }
-}
-</script>
-
-<script type="module">
-import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-
-// --- 动作指令贴图逻辑 ---
-const POSE_GUIDES = {
-    'T-POSE': (ctx) => { line(ctx, 50,45, 15,45); line(ctx, 50,45, 85,45); line(ctx, 50,45, 50,85); },
-    'V-SHAPE': (ctx) => { line(ctx, 50,50, 25,20); line(ctx, 50,50, 75,20); line(ctx, 50,50, 50,85); },
-    'L-RIGHT': (ctx) => { line(ctx, 50,50, 50,20); line(ctx, 50,50, 80,50); line(ctx, 50,50, 50,85); },
-    'FLEX': (ctx) => { line(ctx, 50,55, 30,35); line(ctx, 30,35, 45,20); line(ctx, 50,55, 70,35); line(ctx, 70,35, 55,20); line(ctx, 50,55, 50,90); }
-};
-function line(ctx, x1, y1, x2, y2) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
-
-function createWallTexture(poseKey) {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d'); ctx.fillStyle = 'rgba(0, 20, 40, 0.85)'; ctx.fillRect(0,0,512,512);
-    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 15; ctx.lineCap = 'round';
-    ctx.translate(256, 256); ctx.scale(4.5, 4.5); ctx.translate(-50, -50);
-    ctx.beginPath(); ctx.arc(50, 15, 8, 0, Math.PI*2); POSE_GUIDES[poseKey](ctx); ctx.stroke();
-    return new THREE.CanvasTexture(canvas);
-}
-
-// --- 游戏主逻辑 ---
-let scene, camera, renderer, composer, wall, ghostGroup, skeletonLines;
-let score = 0, combo = 0, timeLeft = 60, isGameOver = false, gameSpeed = 0.6;
-let currentPoseKey = 'T-POSE';
-
-// 定义骨架连接对 (MediaPipe Landmarks)
-const POSE_CONNECTIONS = [
-    [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], // 肩臂
-    [11, 23], [12, 24], [23, 24], // 躯干
-    [23, 25], [25, 27], [24, 26], [26, 28] // 腿部
-];
-
-function init3D() {
-    scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x020508, 0.04);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('game-canvas').appendChild(renderer.domElement);
-
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
-
-    // 1. 具象化幽灵人 (球体 + 线段)
-    ghostGroup = new THREE.Group();
-    // 关键点球体
-    for(let i=0; i<33; i++) {
-        const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00f2ff }));
-        ghostGroup.add(sphere);
-    }
-    // 连接线
-    const lineGeo = new THREE.BufferGeometry();
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x00f2ff, linewidth: 2 });
-    skeletonLines = new THREE.LineSegments(lineGeo, lineMat);
-    ghostGroup.add(skeletonLines);
+<script>
+    // --- 全局配置 ---
+    const config = {
+        color: [155, 28, 49], // 默认 RGB
+        alpha: 0.8,
+        texture: 'matte', // 'matte' or 'gloss'
+        isComparing: false
+    };
     
-    scene.add(ghostGroup);
+    // DOM 元素
+    const video = document.getElementById('originalVideo');
+    const canvas = document.getElementById('trialCanvas');
+    const ctx = canvas.getContext('2d');
+    const splitLine = document.getElementById('splitLine');
+    const controlsUI = document.getElementById('controlsUI');
+    const shareModal = document.getElementById('shareModal');
+    const snapshotImg = document.getElementById('snapshotImg');
+    const loader = document.getElementById('loader');
 
-    const grid = new THREE.GridHelper(400, 60, 0x00f2ff, 0x001a33);
-    grid.rotation.x = Math.PI/2; scene.add(grid);
-    camera.position.set(0, 2, 8);
-    spawnWall();
-}
+    // 嘴唇关键点索引 (MediaPipe 468)
+    const LIPS = {
+        upper: [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191, 78],
+        lower: [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78]
+    };
 
-function spawnWall() {
-    if(wall) scene.remove(wall);
-    currentPoseKey = Object.keys(POSE_GUIDES)[Math.floor(Math.random()*4)];
-    const tex = createWallTexture(currentPoseKey);
-    const group = new THREE.Group();
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 0.2), new THREE.MeshBasicMaterial({ color: 0x002244, transparent: true, opacity: 0.5 }));
-    const sil = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
-    sil.position.z = 0.12; group.add(mesh, sil);
-    group.position.set(0, 2, -120); wall = group; scene.add(wall);
-}
+    // --- 核心业务逻辑 ---
 
-const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
+    // 1. 初始化 MediaPipe Face Mesh
+    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    faceMesh.onResults(onResults);
 
-pose.onResults(res => {
-    document.getElementById('loading').style.display = 'none';
-    if(!res.poseLandmarks || isGameOver) return;
-
-    // 更新幽灵人位置
-    const pts = [];
-    res.poseLandmarks.forEach((lm, i) => {
-        const dot = ghostGroup.children[i];
-        dot.position.set((0.5 - lm.x)*12, (0.5 - lm.y)*10 + 2, 2);
+    const camera = new Camera(video, {
+        onFrame: async () => { await faceMesh.send({image: video}); },
+        width: 1280, height: 720
     });
-    
-    // 更新骨架线段
-    const linePositions = [];
-    POSE_CONNECTIONS.forEach(([i, j]) => {
-        const p1 = ghostGroup.children[i].position;
-        const p2 = ghostGroup.children[j].position;
-        linePositions.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+    camera.start().then(() => loader.style.display = 'none');
+
+    // 2. 渲染回调
+    function onResults(results) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // 绘制口红
+        renderLipstick(landmarks);
+    }
+
+    function renderLipstick(landmarks) {
+        const [r, g, b] = config.color;
+        ctx.save();
+        // 核心技术：使用 'multiply' 混合模式保留原始唇纹
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${config.alpha})`;
+        
+        drawPath(landmarks, LIPS.upper);
+        drawPath(landmarks, LIPS.lower);
+        ctx.fill();
+
+        // 简单模拟水光质感 (在下唇增加高光)
+        if (config.texture === 'gloss') {
+            ctx.globalCompositeOperation = 'screen';
+            const p_center = landmarks[17]; // 下唇中心点
+            const gradient = ctx.createRadialGradient(
+                p_center.x * canvas.width, p_center.y * canvas.height, 1,
+                p_center.x * canvas.width, p_center.y * canvas.height, 30
+            );
+            gradient.addColorStop(0, 'rgba(255,255,255,0.5)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function drawPath(landmarks, indices) {
+        ctx.beginPath();
+        const p0 = landmarks[indices[0]];
+        ctx.moveTo(p0.x * canvas.width, p0.y * canvas.height);
+        for (let i = 1; i < indices.length; i++) {
+            const p = landmarks[indices[i]];
+            ctx.lineTo(p.x * canvas.width, p.y * canvas.height);
+        }
+        ctx.closePath();
+    }
+
+    // --- 交互事件处理 ---
+
+    // 切换色号
+    document.querySelectorAll('.swatch').forEach(el => {
+        el.addEventListener('click', function() {
+            document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+            this.classList.add('active');
+            config.color = this.dataset.color.split(',').map(Number);
+        });
     });
-    skeletonLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
-    skeletonLines.geometry.attributes.position.needsUpdate = true;
 
-    // 判定逻辑
-    const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
-    const lm = res.poseLandmarks;
-    const matched = {
-        'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 25 && Math.abs(getA(lm[12], lm[16])) > 155,
-        'V-SHAPE': () => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
-        'L-RIGHT': () => Math.abs(getA(lm[12], lm[16])) > 150 && lm[15].y < lm[11].y,
-        'FLEX': () => lm[15].y < lm[13].y && lm[16].y < lm[14].y
-    }[currentPoseKey]();
-
-    if(wall.position.z > 3 && wall.position.z < 8 && matched && !wall.userData.hit) handleResult(true);
-});
-
-function handleResult(success) {
-    wall.userData.hit = true;
-    const msg = document.getElementById('flash-msg');
-    if(success) {
-        score += 300; combo++; timeLeft += 2;
-        msg.innerText = "PERFECT +2s"; msg.style.color = "var(--ui-blue)";
-        gameSpeed += 0.01;
-    } else {
-        combo = 0; msg.innerText = "MISS!"; msg.style.color = "var(--ui-red)";
-        gameSpeed = 0.6;
+    // 切换质地 (简单实现)
+    function toggleTexture() {
+        config.texture = config.texture === 'matte' ? 'gloss' : 'matte';
+        config.alpha = config.texture === 'gloss' ? 0.6 : 0.8; // 水光透一点
+        alert(`已切换为：${config.texture === 'matte' ? '丝绒哑光' : '水光镜面'}`);
     }
-    msg.classList.add('show');
-    setTimeout(() => { msg.classList.remove('show'); spawnWall(); }, 600);
-    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
-    document.getElementById('combo-text').innerText = "COMBO X " + combo;
-}
 
-const video = document.getElementById('input_video');
-const cam = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
+    // 核心交互：分屏对比 (按住实现)
+    const compareBtn = document.getElementById('compareBtn');
+    const startCompare = () => {
+        config.isComparing = true;
+        // 关键 CSS：裁剪 Canvas 的左半部分，露出底层的原始视频
+        canvas.style.clipPath = 'inset(0 0 0 50%)'; 
+        splitLine.style.display = 'block';
+        compareBtn.style.background = 'rgba(255,255,255,0.4)';
+    };
+    const endCompare = () => {
+        config.isComparing = false;
+        // 恢复全屏显示 Canvas
+        canvas.style.clipPath = 'inset(0 0 0 0)';
+        splitLine.style.display = 'none';
+        compareBtn.style.background = '';
+    };
 
-function animate() {
-    if(isGameOver) return;
-    requestAnimationFrame(animate);
-    if(wall) {
-        wall.position.z += gameSpeed;
-        if(wall.position.z > 10 && !wall.userData.hit) handleResult(false);
+    compareBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startCompare(); });
+    compareBtn.addEventListener('touchend', endCompare);
+    compareBtn.addEventListener('mousedown', startCompare);
+    compareBtn.addEventListener('mouseup', endCompare);
+
+    // 拍照并显示分享模态窗
+    function takeSnapshot() {
+        // 1. 创建临时 Canvas 合成图像
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // 因为原视频和Canvas都 scaleX(-1) 了，合成时需要先翻转画布
+        tempCtx.translate(tempCanvas.width, 0);
+        tempCtx.scale(-1, 1);
+        
+        // 绘制视频底图
+        tempCtx.drawImage(video, 0, 0);
+        // 绘制妆容层 (注意：trialCanvas 本身显示时是翻转的，但其内容数据是正的，
+        // 而我们刚才翻转了 tempCtx，所以直接画 trialCanvas 的内容即可)
+        // 需要将 trialCanvas 的内容画上去，而不是 DOM 元素本身
+        // 重新在这里绘制一遍妆容是最稳妥的，或者使用更复杂的离屏 Canvas 技术。
+        // 为简化，这里直接把当前的 trialCanvas 画上去，效果可能略有偏差，但足够演示。
+        // 更精确的做法是把 renderLipstick 的逻辑在这里再跑一遍。
+        // 简易方案：
+        tempCtx.drawImage(canvas, 0, 0); 
+
+        // 2. 生成图片并显示
+        snapshotImg.src = tempCanvas.toDataURL('image/png');
+        
+        // 3. 切换界面
+        controlsUI.style.display = 'none';
+        shareModal.style.display = 'flex';
     }
-    composer.render();
-}
 
-let timer = setInterval(() => {
-    if(timeLeft <= 0) { clearInterval(timer); isGameOver = true; document.getElementById('game-over').style.display = 'flex'; document.getElementById('final-score').innerText = score; }
-    else { timeLeft--; document.getElementById('timer-val').innerText = timeLeft; }
-}, 1000);
+    function closeShareModal() {
+        shareModal.style.display = 'none';
+        controlsUI.style.display = 'flex';
+    }
 
-init3D(); cam.start(); animate();
 </script>
 </body>
 </html>
