@@ -3,48 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: Pro Edition</title>
+    <title>Pose Master: Stability Edition</title>
     <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --u-blue: #009dff; --u-gold: #ffcc00; --u-red: #ff3b3b; --u-purple: #9d4eff; }
         body { margin: 0; background: #87ceeb; overflow: hidden; font-family: 'Luckiest Guy', cursive; user-select: none; }
         canvas { display: block; }
 
-        /* 通用全屏遮罩 */
-        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: rgba(135, 206, 235, 0.9); transition: 0.5s; }
-        
-        /* 开始与结算卡片 */
-        .card { background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(15px); padding: 50px; border-radius: 30px; border: 4px solid #fff; text-align: center; color: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
-        h1 { font-size: 5rem; margin: 0 0 30px 0; text-shadow: 0 5px 0 var(--u-blue); }
+        /* 覆盖层：开始与结算 */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: #87ceeb; transition: opacity 0.5s; }
+        .card { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); padding: 50px; border-radius: 40px; border: 6px solid #fff; text-align: center; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.15); max-width: 80%; }
+        h1 { font-size: 5rem; margin: 0 0 20px 0; text-shadow: 0 5px 0 var(--u-blue); }
 
         /* 难度选择按钮 */
-        .difficulty-options { display: flex; gap: 15px; margin-bottom: 30px; }
-        .btn-diff { padding: 15px 35px; border: 2px solid #fff; border-radius: 10px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; color: white; transform: skewX(-15deg); transition: 0.2s; background: #333; pointer-events: auto; }
+        .difficulty-options { display: flex; gap: 15px; margin: 30px 0; flex-wrap: wrap; justify-content: center; }
+        .btn-diff { padding: 15px 40px; border: 3px solid #fff; border-radius: 15px; font-family: 'Luckiest Guy'; font-size: 1.8rem; cursor: pointer; color: white; transform: skewX(-15deg); transition: 0.2s; background: #333; pointer-events: auto; }
         .btn-diff span { display: inline-block; transform: skewX(15deg); }
         .btn-diff:hover { transform: skewX(-15deg) scale(1.1); }
+        .btn-diff:disabled { opacity: 0.5; cursor: not-allowed; transform: skewX(-15deg) scale(1); }
         .btn-easy { background: var(--u-blue); }
-        .btn-med { background: var(--u-gold); color: #000; }
+        .btn-med { background: var(--u-gold); color: #333; }
         .btn-hard { background: var(--u-red); }
         .btn-extreme { background: var(--u-purple); }
 
-        /* 游戏运行中的 HUD */
+        /* HUD */
         #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
-        #header-nav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; pointer-events: auto; }
-        .tab { padding: 8px 30px; background: rgba(0,0,0,0.6); transform: skewX(-15deg); border: 2px solid #fff; font-size: 1.1rem; color: white; cursor: pointer; }
+        #header-nav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; }
+        .tab { padding: 8px 30px; background: rgba(0,0,0,0.7); transform: skewX(-15deg); border: 2px solid #fff; font-size: 1.1rem; color: white; cursor: pointer; }
         .tab span { display: inline-block; transform: skewX(15deg); }
-        .tab.active { background: var(--u-red); box-shadow: 0 0 15px var(--u-red); }
+        .tab.active { background: var(--u-red); box-shadow: 0 0 20px var(--u-red); }
 
-        /* 其他 UI 元素 */
         #timer-panel { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); text-align: center; color: #fff; }
-        #timer-val { font-size: 4rem; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #timer-val { font-size: 5rem; text-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         #score-panel { position: absolute; bottom: 40px; right: 40px; text-align: right; color: #fff; }
-        #score-val { font-size: 3.5rem; color: var(--u-gold); -webkit-text-stroke: 1.5px #000; }
+        #score-val { font-size: 4rem; color: var(--u-gold); -webkit-text-stroke: 1.5px #000; }
         
-        #video-container { position: absolute; top: 20px; right: 20px; width: 200px; height: 150px; border: 3px solid #fff; border-radius: 12px; overflow: hidden; transform: scaleX(-1); background: #000; z-index: 50; }
-        #input_video { width: 100%; height: 100%; object-fit: contain; } 
+        #video-container { position: absolute; top: 20px; right: 20px; width: 220px; height: 165px; border: 4px solid #fff; border-radius: 15px; overflow: hidden; transform: scaleX(-1); background: #222; z-index: 50; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #input_video { width: 100%; height: 100%; object-fit: contain; } /* 关键修复：解决全身看不见问题 */
 
-        #flash-msg { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; opacity: 0; transition: 0.3s; color: white; }
+        #flash-msg { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 7rem; opacity: 0; transition: 0.2s; color: white; text-shadow: 0 0 30px #000; }
         #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+
+        #status-msg { font-family: sans-serif; font-size: 1rem; color: #555; margin-top: 15px; }
+        .error-hint { color: var(--u-red) !important; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -52,23 +53,22 @@
 <div id="start-screen" class="overlay">
     <div class="card">
         <h1>POSE MASTER</h1>
-        <p style="font-size: 1.5rem; margin-bottom: 30px;">模仿墙上的姿势，穿越障碍！</p>
+        <p style="font-size: 1.8rem; margin-bottom: 20px; color: #444;">Ready to Challenge?</p>
         <div class="difficulty-options">
-            <button class="btn-diff btn-easy" onclick="startGame(0.3, 0)"><span>EASY</span></button>
-            <button class="btn-diff btn-med" onclick="startGame(0.5, 1)"><span>MEDIUM</span></button>
-            <button class="btn-diff btn-hard" onclick="startGame(0.8, 2)"><span>HARD</span></button>
-            <button class="btn-diff btn-extreme" onclick="startGame(1.2, 3)"><span>EXTREME</span></button>
+            <button id="b1" class="btn-diff btn-easy" onclick="startGame(0.3, 0)" disabled><span>EASY</span></button>
+            <button id="b2" class="btn-diff btn-med" onclick="startGame(0.5, 1)" disabled><span>MEDIUM</span></button>
+            <button id="b3" class="btn-diff btn-hard" onclick="startGame(0.8, 2)" disabled><span>HARD</span></button>
+            <button id="b4" class="btn-diff btn-extreme" onclick="startGame(1.2, 3)" disabled><span>EXTREME</span></button>
         </div>
-        <p id="loading-msg" style="font-size: 1rem; color: #eee;">正在初始化 AI 引擎...</p>
+        <p id="status-msg">正在唤醒视觉神经元...</p>
     </div>
 </div>
 
-<div id="result-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.85);">
+<div id="result-screen" class="overlay" style="display: none; background: rgba(135,206,235,0.95);">
     <div class="card" style="border-color: var(--u-gold);">
-        <h1 style="color: var(--u-red);">试炼结束</h1>
-        <p style="font-size: 2.5rem; margin: 10px 0;">FINAL SCORE: <span id="final-score" style="color: var(--u-gold);">0000</span></p>
-        <p style="font-size: 1.5rem; opacity: 0.8; margin-bottom: 40px;">WALLS PASSED: <span id="final-walls">0</span></p>
-        <button class="btn-diff btn-easy" style="transform: none;" onclick="location.reload()"><span>再次挑战</span></button>
+        <h1 style="color: var(--u-red);">CHALLENGE OVER</h1>
+        <p style="font-size: 3rem; margin: 10px 0;">SCORE: <span id="final-score" style="color: var(--u-gold);">0000</span></p>
+        <button class="btn-diff btn-easy" style="transform: none; padding: 20px 60px;" onclick="location.reload()"><span>RETRY</span></button>
     </div>
 </div>
 
@@ -80,10 +80,10 @@
         <div class="tab" onclick="changeDifficulty(1.2, 3)"><span>EXTREME</span></div>
     </div>
     <div id="timer-panel"><div id="timer-val">60</div></div>
-    <div style="position: absolute; bottom: 40px; left: 40px; font-size: 2.5rem; color: #fff;">🔥 COMBO X <span id="combo-num">0</span></div>
+    <div style="position: absolute; bottom: 40px; left: 45px; font-size: 3rem; color: #fff; text-shadow: 2px 2px #000;">🔥 X <span id="combo-num">0</span></div>
     <div id="score-panel">
         <div id="score-val">★ 0000</div>
-        <div style="font-size: 1rem;">SPEED: <span id="speed-indicator">1.0</span>x</div>
+        <div style="font-size: 1.2rem; color: #fff;">WALLS PASSED: <span id="walls-passed">0</span></div>
     </div>
     <div id="flash-msg">GREAT!</div>
 </div>
@@ -101,15 +101,189 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// --- 音效引擎 (Mario Style) ---
+// --- 8-bit 音效系统 ---
 const AudioSys = {
     ctx: null,
-    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    init() { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { console.error("Audio failed"); } },
     play(type) {
         if(!this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        const now = this.ctx.currentTime;
-        if (type === 'coin') {
-            osc.type = 'square'; osc.frequency.setValueAtTime(987, now); osc.frequency.setValueAtTime(1318, now + 0.
+        const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+        o.connect(g); g.connect(this.ctx.destination);
+        const t = this.ctx.currentTime;
+        if(type === 'coin') { o.type = 'square'; o.frequency.setValueAtTime(987, t); o.frequency.setValueAtTime(1318, t+0.08); g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.2); o.start(); o.stop(t+0.2); }
+        else { o.type = 'sawtooth'; o.frequency.setValueAtTime(200, t); o.frequency.linearRampToValueAtTime(50, t+0.3); g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.3); o.start(); o.stop(t+0.3); }
+    }
+};
+
+// --- 精细化镂空绘制 (标准化动作) ---
+function drawSilhouette(ctx, key) {
+    ctx.lineWidth = 20; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.translate(256, 256); ctx.scale(4.5, 4.5); ctx.translate(-50, -50);
+    ctx.beginPath();
+    ctx.arc(50, 18, 9, 0, Math.PI * 2); // 头部
+    ctx.moveTo(50, 27); ctx.lineTo(50, 32); // 颈部
+    if(key === 'T-POSE') { ctx.moveTo(10, 42); ctx.lineTo(90, 42); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(30, 95); ctx.moveTo(50, 75); ctx.lineTo(70, 95); }
+    else if(key === 'V-SHAPE') { ctx.moveTo(50, 32); ctx.lineTo(20, 15); ctx.moveTo(50, 32); ctx.lineTo(80, 15); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(35, 95); ctx.moveTo(50, 75); ctx.lineTo(65, 95); }
+    else { ctx.moveTo(50, 32); ctx.lineTo(20, 32); ctx.moveTo(50, 32); ctx.lineTo(80, 15); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(30, 95); ctx.moveTo(50, 75); ctx.lineTo(75, 85); }
+    ctx.stroke();
+}
+
+function createHollowTex(poseKey) {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#008cff'; ctx.fillRect(0, 0, 512, 512); // 实心蓝墙
+    ctx.globalCompositeOperation = 'destination-out'; drawSilhouette(ctx, poseKey); // 挖空
+    ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; drawSilhouette(ctx, poseKey); // 描边
+    return new THREE.CanvasTexture(canvas);
+}
+
+// --- 游戏引擎 ---
+let scene, camera, renderer, composer, wall, ghostGroup, skeletonLines, track, trees = [];
+let score = 0, combo = 0, wallsPassed = 0, timeLeft = 60, gameSpeed = 0.3;
+let isHit = false, currentPose = 'T-POSE';
+window.gameActive = false;
+
+function init3D() {
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x87ceeb); scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('game-canvas').appendChild(renderer.domElement);
+    composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.4, 0.85));
+
+    const loader = new THREE.TextureLoader();
+    const gridTex = loader.load('https://threejs.org/examples/textures/grid.png');
+    gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping; gridTex.repeat.set(1, 25);
+    track = new THREE.Mesh(new THREE.PlaneGeometry(14, 500), new THREE.MeshPhongMaterial({ map: gridTex, color: 0x444444 }));
+    track.rotation.x = -Math.PI / 2; scene.add(track);
+
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(200, 500), new THREE.MeshPhongMaterial({ color: 0x7cfc00 }));
+    grass.rotation.x = -Math.PI / 2; grass.position.y = -0.05; scene.add(grass);
+
+    for(let i=0; i<25; i++) {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3, 6), new THREE.MeshPhongMaterial({color: 0x228b22}));
+        leaves.position.y = 1.5; tree.add(trunk, leaves);
+        tree.position.set(i % 2 === 0 ? -16 : 16, 0, -i * 20); scene.add(tree); trees.push(tree);
+    }
+
+    ghostGroup = new THREE.Group();
+    for(let i=0; i<33; i++) ghostGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0x00f2ff })));
+    skeletonLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
+    ghostGroup.add(skeletonLines); scene.add(ghostGroup);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2), new THREE.DirectionalLight(0xffffff, 0.8));
+    camera.position.set(0, 3.5, 10);
+}
+
+const CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
+
+async function setupAI() {
+    const status = document.getElementById('status-msg');
+    try {
+        const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+        pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
+        pose.onResults(res => {
+            if(!res.poseLandmarks) return;
+            // 解锁按钮
+            status.innerText = "准备就绪，请选择难度！";
+            status.classList.remove('error-hint');
+            [1,2,3,4].forEach(i => document.getElementById('b'+i).disabled = false);
+
+            // 更新幽灵人 (骨架)
+            const lp = [];
+            res.poseLandmarks.forEach((lm, i) => ghostGroup.children[i].position.set((0.5 - lm.x)*14, (0.5 - lm.y)*10 + 2, 2.5));
+            CONNECTIONS.forEach(([i,j]) => {
+                const p1 = ghostGroup.children[i].position, p2 = ghostGroup.children[j].position;
+                lp.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+            });
+            skeletonLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+
+            if(!window.gameActive || isHit) return;
+            const lm = res.poseLandmarks;
+            const matched = {
+                'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 25,
+                'V-SHAPE': () => lm[15].y < lm[11].y,
+                'ARCHER': () => Math.abs(getA(lm[11], lm[13])) < 20
+            }[currentPose]();
+            if(wall.position.z > 3 && wall.position.z < 8.5 && matched) handleResult(true);
+        });
+
+        const cam = new Camera(document.getElementById('input_video'), { 
+            onFrame: async () => { await pose.send({image: document.getElementById('input_video')}); }, 
+            width: 640, height: 480 
+        });
+        await cam.start();
+    } catch(e) {
+        status.innerText = "摄像头启动失败！请检查权限。";
+        status.classList.add('error-hint');
+    }
+}
+
+function spawnWall() {
+    if(wall) scene.remove(wall); isHit = false;
+    currentPose = ['T-POSE', 'V-SHAPE', 'ARCHER'][Math.floor(Math.random()*3)];
+    wall = new THREE.Mesh(new THREE.BoxGeometry(11, 9, 0.5), new THREE.MeshPhongMaterial({ map: createHollowTex(currentPose), transparent: true }));
+    wall.position.set(0, 4.5, -100); scene.add(wall);
+}
+
+function handleResult(success) {
+    if(isHit) return; isHit = true;
+    const msg = document.getElementById('flash-msg');
+    if(success) {
+        score += 300; combo++; timeLeft += 2; wallsPassed++; AudioSys.play('coin');
+        msg.innerText = "PERFECT! +2s"; msg.style.color = "#fff";
+        gameSpeed = Math.min(gameSpeed + 0.015, 1.5);
+    } else {
+        combo = 0; AudioSys.play('hit'); msg.innerText = "MISS!"; msg.style.color = "var(--u-red)";
+    }
+    msg.classList.add('show');
+    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
+    document.getElementById('combo-num').innerText = combo;
+    document.getElementById('walls-passed').innerText = wallsPassed;
+    document.getElementById('speed-indicator').innerText = (gameSpeed / 0.3).toFixed(1);
+    setTimeout(() => { msg.classList.remove('show'); spawnWall(); }, 600);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    if(window.gameActive) {
+        if(track) track.material.map.offset.y -= gameSpeed * 0.15;
+        trees.forEach(t => { t.position.z += gameSpeed * 5; if(t.position.z > 20) t.position.z = -220; });
+        if(wall) { wall.position.z += gameSpeed * 2.5; if(wall.position.z > 15 && !isHit) handleResult(false); }
+    }
+    composer.render();
+}
+
+// --- 全局控制函数 ---
+window.startGame = (speed, idx) => {
+    AudioSys.init(); window.gameActive = true; gameSpeed = speed;
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    spawnWall();
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t => t.classList.remove('active')); tabs[idx].classList.add('active');
+    
+    const countdown = setInterval(() => {
+        if(timeLeft > 0) { timeLeft--; document.getElementById('timer-val').innerText = timeLeft; }
+        else { 
+            clearInterval(countdown); window.gameActive = false; 
+            document.getElementById('result-screen').style.display = 'flex';
+            document.getElementById('final-score').innerText = score;
+        }
+    }, 1000);
+};
+
+window.changeDifficulty = (speed, idx) => {
+    gameSpeed = speed; AudioSys.play('coin');
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t => t.classList.remove('active')); tabs[idx].classList.add('active');
+    document.getElementById('speed-indicator').innerText = (gameSpeed / 0.3).toFixed(1);
+};
+
+init3D(); setupAI(); animate();
+</script>
+</body>
+</html>
