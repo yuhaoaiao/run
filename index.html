@@ -3,55 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: Fixed Edition</title>
+    <title>Pose Master: Parkour Pro Fix</title>
     <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
-        :root { --ui-blue: #00f2ff; --ui-gold: #ffcc00; --ui-red: #ff3344; }
-        body { margin: 0; background: #020508; overflow: hidden; font-family: 'Luckiest Guy', cursive; color: white; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        #timer-panel { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); text-align: center; }
-        #timer-val { font-size: 4rem; text-shadow: 0 0 20px var(--ui-blue); }
-        #score-panel { position: absolute; bottom: 30px; right: 40px; text-align: right; }
-        #score-val { font-size: 3.5rem; color: var(--ui-gold); }
-        #video-container { position: absolute; top: 20px; right: 20px; width: 200px; height: 150px; border: 2px solid var(--ui-blue); border-radius: 8px; overflow: hidden; transform: scaleX(-1); box-shadow: 0 0 15px var(--ui-blue); opacity: 0.8; background: #000; }
-        #input_video { width: 100%; height: 100%; object-fit: cover; }
-        #game-over { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(15px); }
-        .restart-btn { margin-top: 20px; padding: 12px 30px; background: var(--ui-blue); border: none; border-radius: 30px; font-family: 'Luckiest Guy'; font-size: 1.5rem; cursor: pointer; pointer-events: auto; }
-        #flash-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; opacity: 0; transition: 0.3s; }
+        :root { --u-blue: #009dff; --u-gold: #ffcc00; --u-red: #ff3b3b; --u-purple: #9d4eff; }
+        body { margin: 0; background: #87ceeb; overflow: hidden; font-family: 'Luckiest Guy', cursive; user-select: none; }
+        
+        /* 覆盖层：开始、加载与结算 */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: #87ceeb; }
+        .card { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); padding: 50px; border-radius: 40px; border: 6px solid #fff; text-align: center; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.15); max-width: 80%; }
+        
+        .difficulty-options { display: flex; gap: 15px; margin: 30px 0; }
+        .btn-diff { padding: 15px 40px; border: 3px solid #fff; border-radius: 15px; font-family: 'Luckiest Guy'; font-size: 1.8rem; cursor: pointer; color: white; transform: skewX(-15deg); transition: 0.2s; background: #333; pointer-events: auto; }
+        .btn-diff span { display: inline-block; transform: skewX(15deg); }
+        .btn-diff:hover { transform: skewX(-15deg) scale(1.1); }
+        .btn-diff:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 游戏运行 HUD */
+        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
+        #header-nav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; }
+        .tab { padding: 8px 30px; background: rgba(0,0,0,0.7); transform: skewX(-15deg); border: 2px solid #fff; font-size: 1.1rem; color: white; cursor: pointer; }
+        .tab span { display: inline-block; transform: skewX(15deg); }
+        .tab.active { background: var(--u-red); box-shadow: 0 0 20px var(--u-red); }
+
+        #timer-val { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); font-size: 5rem; color: #fff; text-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #score-panel { position: absolute; bottom: 40px; right: 40px; text-align: right; color: #fff; }
+        #score-val { font-size: 4rem; color: var(--u-gold); -webkit-text-stroke: 1.5px #000; }
+        
+        #video-container { position: absolute; top: 20px; right: 20px; width: 220px; height: 165px; border: 4px solid #fff; border-radius: 15px; overflow: hidden; transform: scaleX(-1); background: #222; z-index: 50; }
+        #input_video { width: 100%; height: 100%; object-fit: contain; } /* 视野修正 */
+
+        #flash-msg { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 7rem; opacity: 0; transition: 0.2s; color: white; text-shadow: 0 0 30px #000; }
         #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-        #loading { position: absolute; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; color: var(--ui-blue); }
     </style>
 </head>
 <body>
 
-<div id="loading">POSE MASTER INITIALIZING...</div>
-
-<div id="game-over">
-    <div style="text-align: center; border: 4px solid var(--ui-blue); padding: 40px; border-radius: 20px; background: #000;">
-        <h1 style="color: var(--ui-red); font-size: 3rem;">TIME'S UP!</h1>
-        <p style="font-size: 2rem;">FINAL SCORE: <span id="final-score" style="color: var(--ui-gold);">0</span></p>
-        <button class="restart-btn" onclick="location.reload()">RETRY CHALLENGE</button>
+<div id="start-screen" class="overlay">
+    <div class="card">
+        <h1 style="font-size: 5rem; margin:0; text-shadow: 0 5px 0 var(--u-blue);">POSE MASTER</h1>
+        <p style="font-size: 1.8rem; color: #444;">穿越镂空墙，挑战极限！</p>
+        <div class="difficulty-options">
+            <button id="b1" class="btn-diff" style="background:var(--u-blue)" onclick="startGame(0.35, 0)" disabled><span>EASY</span></button>
+            <button id="b2" class="btn-diff" style="background:var(--u-gold);color:#000" onclick="startGame(0.55, 1)" disabled><span>MEDIUM</span></button>
+            <button id="b3" class="btn-diff" style="background:var(--u-red)" onclick="startGame(0.85, 2)" disabled><span>HARD</span></button>
+            <button id="b4" class="btn-diff" style="background:var(--u-purple)" onclick="startGame(1.2, 3)" disabled><span>EXTREME</span></button>
+        </div>
+        <p id="status-msg" style="color:#555;">正在加载 AI 核心...</p>
     </div>
 </div>
 
-<div id="ui-layer">
-    <div id="timer-panel">
-        <div id="timer-val">60</div>
-        <div style="font-size: 1rem; letter-spacing: 5px; color: var(--ui-blue);">SECONDS LEFT</div>
+<div id="result-screen" class="overlay" style="display: none; background: rgba(135,206,235,0.95);">
+    <div class="card" style="border-color: var(--u-gold);">
+        <h1 style="color: var(--u-red);">CHALLENGE OVER</h1>
+        <p style="font-size: 3rem; margin: 10px 0;">SCORE: <span id="final-score" style="color: var(--u-gold);">0000</span></p>
+        <button class="btn-diff" style="background:var(--u-blue);transform:none" onclick="location.reload()"><span>RETRY</span></button>
     </div>
+</div>
+
+<div id="hud">
+    <div id="header-nav">
+        <div class="tab" onclick="changeDifficulty(0.35, 0)"><span>EASY</span></div>
+        <div class="tab" onclick="changeDifficulty(0.55, 1)"><span>MEDIUM</span></div>
+        <div class="tab" onclick="changeDifficulty(0.85, 2)"><span>HARD</span></div>
+        <div class="tab" onclick="changeDifficulty(1.2, 3)"><span>EXTREME</span></div>
+    </div>
+    <div id="timer-val">60</div>
+    <div style="position: absolute; bottom: 40px; left: 45px; font-size: 3rem; color: #fff;">🔥 X <span id="combo-num">0</span></div>
     <div id="score-panel">
         <div id="score-val">★ 0000</div>
-        <div id="combo-text" style="color: var(--ui-blue);">COMBO X 0</div>
+        <div style="font-size: 1.2rem;">WALLS PASSED: <span id="walls-passed">0</span></div>
     </div>
-    <div id="flash-msg">PERFECT</div>
+    <div id="flash-msg">GREAT!</div>
 </div>
 
-<div id="video-container"><video id="input_video" playsinline></video></div>
+<div id="video-container"><video id="input_video" playsinline muted></video></div>
 <div id="game-canvas"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.158.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/" } }</script>
+<script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.158.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/" } } </script>
 
 <script type="module">
 import * as THREE from 'three';
@@ -59,162 +90,206 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// --- 动作定义 ---
-const POSE_GUIDES = {
-    'T-POSE': (ctx) => { line(ctx, 50,45, 15,45); line(ctx, 50,45, 85,45); line(ctx, 50,45, 50,85); },
-    'V-SHAPE': (ctx) => { line(ctx, 50,50, 25,20); line(ctx, 50,50, 75,20); line(ctx, 50,50, 50,85); },
-    'L-RIGHT': (ctx) => { line(ctx, 50,50, 50,20); line(ctx, 50,50, 80,50); line(ctx, 50,50, 50,85); },
-    'FLEX': (ctx) => { line(ctx, 50,55, 30,35); line(ctx, 30,35, 45,20); line(ctx, 50,55, 70,35); line(ctx, 70,35, 55,20); line(ctx, 50,55, 50,90); }
+// --- 音效引擎 (Retro Style) ---
+const AudioSys = {
+    ctx: null,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    play(type) {
+        if(!this.ctx) return;
+        const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+        o.connect(g); g.connect(this.ctx.destination);
+        const t = this.ctx.currentTime;
+        if(type === 'coin') { o.type = 'square'; o.frequency.setValueAtTime(987, t); o.frequency.setValueAtTime(1318, t+0.08); g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.2); o.start(); o.stop(t+0.2); }
+        else { o.type = 'sawtooth'; o.frequency.setValueAtTime(200, t); o.frequency.linearRampToValueAtTime(50, t+0.3); g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.3); o.start(); o.stop(t+0.3); }
+    }
 };
-function line(ctx, x1, y1, x2, y2) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
 
-function createWallTexture(poseKey) {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d'); ctx.fillStyle = 'rgba(0, 20, 40, 0.85)'; ctx.fillRect(0,0,512,512);
-    ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 15; ctx.lineCap = 'round';
+// --- 精细镂空绘制 ---
+function drawSilhouette(ctx, key) {
+    ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.translate(256, 256); ctx.scale(4.5, 4.5); ctx.translate(-50, -50);
-    ctx.beginPath(); ctx.arc(50, 15, 8, 0, Math.PI*2); POSE_GUIDES[poseKey](ctx); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(50, 18, 9, 0, Math.PI * 2); // 头
+    ctx.moveTo(50, 27); ctx.lineTo(50, 32); // 颈
+    if(key === 'T-POSE') { ctx.moveTo(10, 42); ctx.lineTo(90, 42); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(35, 95); ctx.moveTo(50, 75); ctx.lineTo(65, 95); }
+    else if(key === 'V-SHAPE') { ctx.moveTo(50, 32); ctx.lineTo(25, 12); ctx.moveTo(50, 32); ctx.lineTo(75, 12); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(35, 95); ctx.moveTo(50, 75); ctx.lineTo(65, 95); }
+    else { ctx.moveTo(50, 32); ctx.lineTo(20, 32); ctx.moveTo(50, 32); ctx.lineTo(80, 15); ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(30, 95); ctx.moveTo(50, 75); ctx.lineTo(75, 85); }
+    ctx.stroke();
+}
+
+function createHollowTex(poseKey) {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#008cff'; ctx.fillRect(0, 0, 512, 512); // 实心墙
+    ctx.globalCompositeOperation = 'destination-out'; drawSilhouette(ctx, poseKey); // 挖空
+    ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; drawSilhouette(ctx, poseKey); // 亮边
     return new THREE.CanvasTexture(canvas);
 }
 
-// --- 游戏变量 ---
-let scene, camera, renderer, composer, wall, ghostGroup, skeletonLines;
-let score = 0, combo = 0, timeLeft = 60, isGameOver = false, gameSpeed = 0.6;
-let currentPoseKey = 'T-POSE', isHitInProgress = false;
-
-const POSE_CONNECTIONS = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
+// --- 游戏 3D 逻辑 ---
+let scene, camera, renderer, composer, wall, ghostGroup, skeletonLines, track, trees = [];
+let score = 0, combo = 0, wallsPassed = 0, timeLeft = 60;
+let gameSpeed = 0.35, isHit = false, currentPoseKey = 'T-POSE';
+window.gameActive = false;
 
 function init3D() {
-    scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x020508, 0.04);
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x87ceeb); scene.fog = new THREE.Fog(0x87ceeb, 20, 110);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('game-canvas').appendChild(renderer.domElement);
+    composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.4, 0.85));
 
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
+    const loader = new THREE.TextureLoader();
+    const gridTex = loader.load('https://threejs.org/examples/textures/grid.png');
+    gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping; gridTex.repeat.set(1, 25);
+    track = new THREE.Mesh(new THREE.PlaneGeometry(14, 500), new THREE.MeshPhongMaterial({ map: gridTex, color: 0x444444 }));
+    track.rotation.x = -Math.PI / 2; scene.add(track);
+
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(200, 500), new THREE.MeshPhongMaterial({ color: 0x7cfc00 }));
+    grass.rotation.x = -Math.PI / 2; grass.position.y = -0.05; scene.add(grass);
+
+    for(let i=0; i<25; i++) {
+        const tree = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3, 6), new THREE.MeshPhongMaterial({color: 0x228b22}));
+        leaves.position.y = 1.5; tree.add(trunk, leaves);
+        tree.position.set(i % 2 === 0 ? -16 : 16, 0, -i * 20); scene.add(tree); trees.push(tree);
+    }
 
     ghostGroup = new THREE.Group();
-    for(let i=0; i<33; i++) ghostGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0x00f2ff })));
-    skeletonLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00f2ff, linewidth: 2 }));
+    for(let i=0; i<33; i++) ghostGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0x00f2ff })));
+    skeletonLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
     ghostGroup.add(skeletonLines); scene.add(ghostGroup);
 
-    const grid = new THREE.GridHelper(400, 60, 0x00f2ff, 0x001a33);
-    grid.rotation.x = Math.PI/2; scene.add(grid);
-    camera.position.set(0, 2, 8);
-    spawnWall();
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2), new THREE.DirectionalLight(0xffffff, 0.8));
+    camera.position.set(0, 3.5, 10);
+}
+
+// --- AI 与 逻辑系统 ---
+const CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
+
+async function setupAI() {
+    const status = document.getElementById('status-msg');
+    try {
+        const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+        pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
+        pose.onResults(res => {
+            if(!res.poseLandmarks) return;
+            status.innerText = "准备就绪，选择难度开始！";
+            [1,2,3,4].forEach(i => document.getElementById('b'+i).disabled = false);
+
+            const lp = [];
+            res.poseLandmarks.forEach((lm, i) => ghostGroup.children[i].position.set((0.5 - lm.x)*14, (0.5 - lm.y)*10 + 2, 2.5));
+            CONNECTIONS.forEach(([i,j]) => {
+                const p1 = ghostGroup.children[i].position, p2 = ghostGroup.children[j].position;
+                lp.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+            });
+            skeletonLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+
+            if(!window.gameActive || isHit || !wall) return;
+            const lm = res.poseLandmarks;
+            const matched = {
+                'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 35 && Math.abs(getA(lm[12], lm[16])) > 145,
+                'V-SHAPE': () => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
+                'ARCHER': () => Math.abs(getA(lm[11], lm[13])) < 35
+            }[currentPoseKey]();
+
+            if(wall.position.z > 3.5 && wall.position.z < 8.5 && matched) handleResult(true);
+        });
+
+        const cam = new Camera(document.getElementById('input_video'), { 
+            onFrame: async () => { await pose.send({image: document.getElementById('input_video')}); }, 
+            width: 640, height: 480 
+        });
+        await cam.start();
+    } catch(e) { status.innerText = "摄像头启动失败。"; }
 }
 
 function spawnWall() {
     if(wall) scene.remove(wall);
-    isHitInProgress = false; // 重置判定锁
-    currentPoseKey = Object.keys(POSE_GUIDES)[Math.floor(Math.random()*4)];
-    const group = new THREE.Group();
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 0.2), new THREE.MeshBasicMaterial({ color: 0x002244, transparent: true, opacity: 0.5 }));
-    const sil = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: createWallTexture(currentPoseKey), transparent: true }));
-    sil.position.z = 0.12; group.add(mesh, sil);
-    group.position.set(0, 2, -120);
-    wall = group; scene.add(wall);
+    isHit = false; // 重置判定锁
+    currentPoseKey = ['T-POSE', 'V-SHAPE', 'ARCHER'][Math.floor(Math.random()*3)];
+    const tex = createHollowTex(currentPoseKey);
+    wall = new THREE.Mesh(new THREE.BoxGeometry(11, 9, 0.5), new THREE.MeshPhongMaterial({ map: tex, transparent: true }));
+    wall.position.set(0, 4.5, -110);
+    scene.add(wall);
 }
 
-// --- AI 逻辑 ---
-const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
-
-pose.onResults(res => {
-    document.getElementById('loading').style.display = 'none';
-    if(!res.poseLandmarks || isGameOver || !wall) return; // 增加 !wall 安全检查
-
-    // 更新骨架
-    res.poseLandmarks.forEach((lm, i) => ghostGroup.children[i].position.set((0.5 - lm.x)*12, (0.5 - lm.y)*10 + 2, 2));
-    const lp = [];
-    POSE_CONNECTIONS.forEach(([i, j]) => {
-        const p1 = ghostGroup.children[i].position, p2 = ghostGroup.children[j].position;
-        lp.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-    });
-    skeletonLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
-    skeletonLines.geometry.attributes.position.needsUpdate = true;
-
-    // 姿态匹配判定
-    const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
-    const lm = res.poseLandmarks;
-    const isMatched = {
-        'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 25 && Math.abs(getA(lm[12], lm[16])) > 155,
-        'V-SHAPE': () => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
-        'L-RIGHT': () => Math.abs(getA(lm[12], lm[16])) > 150 && lm[15].y < lm[11].y,
-        'FLEX': () => lm[15].y < lm[13].y && lm[16].y < lm[14].y
-    }[currentPoseKey]();
-
-    // 核心修复：增加 isHitInProgress 锁，防止单面墙多次触发 handleResult
-    if(wall.position.z > 3 && wall.position.z < 8.5 && isMatched && !isHitInProgress) {
-        handleResult(true);
-    }
-});
-
 function handleResult(success) {
-    if (isHitInProgress) return;
-    isHitInProgress = true; // 锁定当前判定
-    
+    if(isHit) return; isHit = true; 
     const msg = document.getElementById('flash-msg');
+    
     if(success) {
-        score += 300; combo++; timeLeft += 2;
-        msg.innerText = "PERFECT +2s"; msg.style.color = "var(--ui-blue)";
-        gameSpeed += 0.01;
+        score += 300; combo++; timeLeft += 2; wallsPassed++; AudioSys.play('coin');
+        msg.innerText = "PERFECT! +2s"; msg.style.color = "#fff";
+        gameSpeed = Math.min(gameSpeed + 0.015, 1.6);
     } else {
-        combo = 0; msg.innerText = "MISS!"; msg.style.color = "var(--ui-red)";
-        gameSpeed = 0.6;
+        combo = 0; AudioSys.play('hit'); msg.innerText = "MISS!"; msg.style.color = "var(--u-red)";
+        gameSpeed = window.baseSpeed || 0.35;
     }
     
     msg.classList.add('show');
-    // UI 更新
-    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
-    document.getElementById('combo-text').innerText = "COMBO X " + combo;
+    updateHUD();
+    
+    if(wall) scene.remove(wall); // 立即清理旧墙，防止逻辑堆叠
+    wall = null; 
 
-    setTimeout(() => {
-        msg.classList.remove('show');
-        spawnWall(); // 生成新墙并重置锁定状态
+    setTimeout(() => { 
+        msg.classList.remove('show'); 
+        spawnWall(); 
     }, 600);
 }
 
-// --- 动画循环 ---
+function updateHUD() {
+    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
+    document.getElementById('combo-num').innerText = combo;
+    document.getElementById('walls-passed').innerText = wallsPassed;
+}
+
 function animate() {
-    if(isGameOver) return;
     requestAnimationFrame(animate);
-    if(wall) {
-        wall.position.z += gameSpeed;
-        // 核心修复：墙体飞过 z=10 且未被判定成功时，判定为 MISS
-        if(wall.position.z > 10 && !isHitInProgress) {
-            handleResult(false);
+    if(window.gameActive) {
+        if(track) track.material.map.offset.y -= gameSpeed * 0.12;
+        trees.forEach(t => { t.position.z += gameSpeed * 5; if(t.position.z > 20) t.position.z = -230; });
+        if(wall && !isHit) { 
+            wall.position.z += gameSpeed * 2.8;
+            if(wall.position.z > 16) handleResult(false); // 超越视野自动判 MISS
         }
     }
     composer.render();
 }
 
-// --- 计时器系统：整合到启动流程中 ---
-function startTimer() {
-    const timer = setInterval(() => {
-        if (isGameOver) { clearInterval(timer); return; }
-        if(timeLeft <= 0) {
-            clearInterval(timer);
-            isGameOver = true;
-            document.getElementById('game-over').style.display = 'flex';
+window.startGame = (speed, idx) => {
+    AudioSys.init(); window.gameActive = true; window.baseSpeed = speed; gameSpeed = speed;
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    spawnWall(); updateHUD();
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t => t.classList.remove('active')); tabs[idx].classList.add('active');
+    
+    const countdown = setInterval(() => {
+        if(timeLeft > 0) { 
+            timeLeft--; 
+            document.getElementById('timer-val').innerText = timeLeft; 
+        } else { 
+            clearInterval(countdown); 
+            window.gameActive = false; 
+            document.getElementById('result-screen').style.display = 'flex';
             document.getElementById('final-score').innerText = score;
-        } else {
-            timeLeft--;
-            document.getElementById('timer-val').innerText = timeLeft;
         }
     }, 1000);
-}
+};
 
-// 启动游戏
-const video = document.getElementById('input_video');
-const cam = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
+window.changeDifficulty = (speed, idx) => {
+    window.baseSpeed = speed; gameSpeed = speed; AudioSys.play('coin');
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t => t.classList.remove('active')); tabs[idx].classList.add('active');
+    AudioSys.play('coin');
+};
 
-init3D();
-cam.start();
-animate();
-startTimer(); // 确保计时器在脚本加载后立即开始
+init3D(); setupAI(); animate();
 </script>
 </body>
 </html>
