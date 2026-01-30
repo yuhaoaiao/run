@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pose Master: City Park Rush</title>
+    <title>Pose Master: Parkour Rush</title>
     <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Luckiest+Guy&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --u-blue: #009dff; --u-gold: #ffcc00; --u-red: #ff3b3b; }
         body { margin: 0; background: #87ceeb; overflow: hidden; font-family: 'Luckiest Guy', cursive; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: white; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: white; display: none; }
         #header-nav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; }
         .tab { padding: 8px 30px; background: rgba(0,0,0,0.6); transform: skewX(-15deg); border: 2px solid #fff; font-size: 1.1rem; }
         .tab span { display: inline-block; transform: skewX(15deg); }
@@ -17,15 +17,20 @@
         #timer-val { font-size: 4rem; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         #score-panel { position: absolute; bottom: 40px; right: 40px; text-align: right; }
         #score-val { font-size: 3.5rem; color: var(--u-gold); -webkit-text-stroke: 1.5px #000; }
-        #video-container { position: absolute; top: 20px; right: 20px; width: 180px; height: 135px; border: 3px solid #fff; border-radius: 12px; overflow: hidden; transform: scaleX(-1); background: #000; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        #flash-msg { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; opacity: 0; transition: 0.3s; }
+        #video-container { position: absolute; top: 20px; right: 20px; width: 180px; height: 135px; border: 3px solid #fff; border-radius: 12px; overflow: hidden; transform: scaleX(-1); background: #000; }
+        #flash-msg { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 6rem; opacity: 0; transition: 0.3s; pointer-events: none;}
         #flash-msg.show { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-        #loading { position: absolute; width: 100%; height: 100%; background: #87ceeb; z-index: 100; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem; }
+        #loading { position: absolute; width: 100%; height: 100%; background: #87ceeb; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.5rem; text-align: center; padding: 20px; box-sizing: border-box; }
+        #error-log { font-family: sans-serif; font-size: 0.9rem; color: #ff0000; margin-top: 20px; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 5px; display: none; }
     </style>
 </head>
 <body>
 
-<div id="loading">正在布置公园赛道...</div>
+<div id="loading">
+    <div style="font-size: 4rem; margin-bottom: 20px; animation: bounce 1s infinite;">🏃‍♂️</div>
+    <div id="loading-text">正在布置公园赛道...<br><small>请确保已开启摄像头权限</small></div>
+    <div id="error-log"></div>
+</div>
 
 <div id="ui-layer">
     <div id="header-nav">
@@ -44,7 +49,7 @@
     <div id="flash-msg">GREAT!</div>
 </div>
 
-<div id="video-container"><video id="input_video" style="width:100%; height:100%; object-fit: cover;"></video></div>
+<div id="video-container"><video id="input_video" playsinline muted></video></div>
 <div id="game-canvas"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -57,169 +62,194 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-// ========================
-// 1. 极致还原：精细镂空纹理生成器
-// ========================
-function drawPrecisePerson(ctx, key) {
-    ctx.lineWidth = 18; // 调细画笔，形状更精准
+// --- 错误诊断函数 ---
+function showError(msg) {
+    const log = document.getElementById('error-log');
+    log.innerText = "错误详情: " + msg;
+    log.style.display = 'block';
+    document.getElementById('loading-text').innerText = "启动失败";
+}
+
+// --- 精细镂空绘制 (优化线条粗细) ---
+function drawSilhouette(ctx, key) {
+    ctx.lineWidth = 16; // 调细：形状更明确
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.translate(256, 256); ctx.scale(4.2, 4.2); ctx.translate(-50, -50);
-    
     ctx.beginPath();
-    // 头部
-    ctx.arc(50, 18, 8, 0, Math.PI * 2);
-    // 颈部连接
-    ctx.moveTo(50, 26); ctx.lineTo(50, 32);
-    
+    ctx.arc(50, 18, 8, 0, Math.PI * 2); // 头部
+    ctx.moveTo(50, 26); ctx.lineTo(50, 32); // 颈部
     if(key === 'T-POSE') {
-        ctx.moveTo(15, 40); ctx.lineTo(85, 40); // 臂
-        ctx.moveTo(50, 32); ctx.lineTo(50, 70); // 躯干
-        ctx.moveTo(50, 70); ctx.lineTo(35, 95); ctx.moveTo(50, 70); ctx.lineTo(65, 95); // 腿
+        ctx.moveTo(15, 42); ctx.lineTo(85, 42); 
+        ctx.moveTo(50, 32); ctx.lineTo(50, 75);
+        ctx.moveTo(50, 75); ctx.lineTo(35, 95); ctx.moveTo(50, 75); ctx.lineTo(65, 95);
     } else if(key === 'V-SHAPE') {
-        ctx.moveTo(50, 32); ctx.lineTo(25, 10); ctx.moveTo(50, 32); ctx.lineTo(75, 10);
-        ctx.moveTo(50, 32); ctx.lineTo(50, 70); ctx.moveTo(50, 70); ctx.lineTo(35, 95); ctx.moveTo(50, 70); ctx.lineTo(65, 95);
-    } else if(key === 'FLEX') {
-        ctx.moveTo(50, 32); ctx.lineTo(25, 30); ctx.lineTo(25, 15);
-        ctx.moveTo(50, 32); ctx.lineTo(75, 30); ctx.lineTo(75, 15);
-        ctx.moveTo(50, 32); ctx.lineTo(50, 70); ctx.moveTo(50, 70); ctx.lineTo(40, 95); ctx.moveTo(50, 70); ctx.lineTo(60, 95);
-    } else if(key === 'L-LEFT') {
-        ctx.moveTo(50, 32); ctx.lineTo(50, 5); ctx.moveTo(50, 32); ctx.lineTo(20, 32);
-        ctx.moveTo(50, 32); ctx.lineTo(50, 70); ctx.moveTo(50, 70); ctx.lineTo(35, 95); ctx.moveTo(50, 70); ctx.lineTo(65, 95);
-    } else {
-        // 默认动作 (Zen/Cross)
-        ctx.moveTo(50, 32); ctx.lineTo(35, 50); ctx.lineTo(50, 60); ctx.lineTo(65, 50); ctx.lineTo(50, 32);
-        ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(30, 95); ctx.moveTo(50, 75); ctx.lineTo(70, 95);
+        ctx.moveTo(50, 32); ctx.lineTo(25, 12); ctx.moveTo(50, 32); ctx.lineTo(75, 12);
+        ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(35, 95); ctx.moveTo(50, 75); ctx.lineTo(65, 95);
+    } else { // ARCHER
+        ctx.moveTo(50, 32); ctx.lineTo(20, 32); ctx.moveTo(50, 32); ctx.lineTo(80, 15);
+        ctx.moveTo(50, 32); ctx.lineTo(50, 75); ctx.moveTo(50, 75); ctx.lineTo(30, 95); ctx.moveTo(50, 75); ctx.lineTo(75, 85);
     }
     ctx.stroke();
 }
 
-function createHollowWallTexture(poseKey) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
+function createHollowTexture(poseKey) {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    
-    // 蓝色实体墙面
-    ctx.fillStyle = '#008cff'; ctx.fillRect(0, 0, 512, 512);
-    // 绘制白色边框增强对比
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = '#ffffff';
-    drawPrecisePerson(ctx, poseKey);
-    ctx.restore();
-    
-    // 镂空
-    ctx.globalCompositeOperation = 'destination-out';
-    drawPrecisePerson(ctx, poseKey);
-    
+    ctx.fillStyle = '#008cff'; ctx.fillRect(0, 0, 512, 512); // 实心墙
+    ctx.globalCompositeOperation = 'destination-out'; // 挖空模式
+    drawSilhouette(ctx, poseKey);
+    ctx.globalCompositeOperation = 'source-over'; // 恢复模式
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; // 描边亮边
+    drawSilhouette(ctx, poseKey);
     return new THREE.CanvasTexture(canvas);
 }
 
-// ========================
-// 2. 3D 城市公园场景
-// ========================
+// --- 游戏主逻辑 ---
 let scene, camera, renderer, composer, wall, ghostGroup, skeletonLines;
-let track, grass, trees = [];
-let score = 0, combo = 0, wallsPassed = 0, timeLeft = 60, gameSpeed = 0.35;
+let track, trees = [];
+let score = 0, combo = 0, wallsPassed = 0, timeLeft = 60, gameSpeed = 0.3;
 let isGameOver = false, isHit = false, currentPoseKey = 'T-POSE';
 
 function init3D() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // 天空蓝
-    scene.fog = new THREE.Fog(0x87ceeb, 20, 120);
+    try {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('game-canvas').appendChild(renderer.domElement);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('game-canvas').appendChild(renderer.domElement);
 
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.4, 0.85));
+        composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.4, 0.85));
 
-    // A. 地面系统
-    const loader = new THREE.TextureLoader();
-    // 赛道材质
-    const trackTex = loader.load('https://threejs.org/examples/textures/grid.png');
-    trackTex.wrapS = trackTex.wrapT = THREE.RepeatWrapping;
-    trackTex.repeat.set(1, 20);
-    const trackGeo = new THREE.PlaneGeometry(12, 400);
-    const trackMat = new THREE.MeshPhongMaterial({ map: trackTex, color: 0x444444 });
-    track = new THREE.Mesh(trackGeo, trackMat);
-    track.rotation.x = -Math.PI / 2;
-    scene.add(track);
+        // 公园地面：动态偏移网格
+        const loader = new THREE.TextureLoader();
+        const gridTex = loader.load('https://threejs.org/examples/textures/grid.png');
+        gridTex.wrapS = gridTex.wrapT = THREE.RepeatWrapping;
+        gridTex.repeat.set(1, 20);
+        track = new THREE.Mesh(new THREE.PlaneGeometry(12, 400), new THREE.MeshPhongMaterial({ map: gridTex, color: 0x444444 }));
+        track.rotation.x = -Math.PI / 2;
+        scene.add(track);
 
-    // 草坪材质
-    const grassGeo = new THREE.PlaneGeometry(200, 400);
-    const grassMat = new THREE.MeshPhongMaterial({ color: 0x7cfc00 }); // 嫩绿色
-    grass = new THREE.Mesh(grassGeo, grassMat);
-    grass.rotation.x = -Math.PI / 2;
-    grass.position.y = -0.1;
-    scene.add(grass);
+        const grass = new THREE.Mesh(new THREE.PlaneGeometry(200, 400), new THREE.MeshPhongMaterial({ color: 0x7cfc00 }));
+        grass.rotation.x = -Math.PI / 2; grass.position.y = -0.05;
+        scene.add(grass);
 
-    // B. 侧墙 (半透明护栏)
-    const wallGeo = new THREE.PlaneGeometry(1, 400);
-    const wallMat = new THREE.MeshPhongMaterial({ color: 0x009dff, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
-    const leftRail = new THREE.Mesh(wallGeo, wallMat);
-    leftRail.position.set(-6, 0.5, 0); leftRail.rotation.y = Math.PI/2;
-    const rightRail = new THREE.Mesh(wallGeo, wallMat);
-    rightRail.position.set(6, 0.5, 0); rightRail.rotation.y = -Math.PI/2;
-    scene.add(leftRail, rightRail);
+        // 半透明护栏
+        const railMat = new THREE.MeshPhongMaterial({ color: 0x009dff, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+        const leftRail = new THREE.Mesh(new THREE.PlaneGeometry(2, 400), railMat);
+        leftRail.position.set(-6, 1, 0); leftRail.rotation.y = Math.PI/2;
+        const rightRail = new THREE.Mesh(new THREE.PlaneGeometry(2, 400), railMat);
+        rightRail.position.set(6, 1, 0); rightRail.rotation.y = -Math.PI/2;
+        scene.add(leftRail, rightRail);
 
-    // C. 低多边形树木
-    for(let i=0; i<30; i++) {
-        const tree = createTree();
-        tree.position.set(i % 2 === 0 ? -15 - Math.random()*5 : 15 + Math.random()*5, 0, -i * 15);
-        scene.add(tree);
-        trees.push(tree);
-    }
+        // 景观树
+        for(let i=0; i<20; i++) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(1, 2.5, 6), new THREE.MeshPhongMaterial({color: 0x228b22}));
+            leaves.position.y = 1.5; tree.add(trunk, leaves);
+            tree.position.set(i % 2 === 0 ? -15 : 15, 0, -i * 20);
+            scene.add(tree); trees.push(tree);
+        }
 
-    // D. 幽灵骨架
-    ghostGroup = new THREE.Group();
-    for(let i=0; i<33; i++) ghostGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0x00f2ff })));
-    skeletonLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00f2ff, linewidth: 3 }));
-    ghostGroup.add(skeletonLines);
-    scene.add(ghostGroup);
+        // 幽灵骨架
+        ghostGroup = new THREE.Group();
+        for(let i=0; i<33; i++) ghostGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0x00f2ff })));
+        skeletonLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
+        ghostGroup.add(skeletonLines); scene.add(ghostGroup);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2), new THREE.DirectionalLight(0xffffff, 0.8));
-    camera.position.set(0, 3, 10);
-    spawnWall();
-}
-
-function createTree() {
-    const group = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.5), new THREE.MeshPhongMaterial({ color: 0x8b4513 }));
-    trunk.position.y = 0.75;
-    const leaves = new THREE.Mesh(new THREE.ConeGeometry(1, 3, 6), new THREE.MeshPhongMaterial({ color: 0x228b22 }));
-    leaves.position.y = 2.5;
-    group.add(trunk, leaves);
-    return group;
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2), new THREE.DirectionalLight(0xffffff, 0.8));
+        camera.position.set(0, 3, 10);
+        spawnWall();
+    } catch(e) { showError("Three.js 初始化失败: " + e.message); }
 }
 
 function spawnWall() {
     if(wall) scene.remove(wall);
     isHit = false;
-    currentPoseKey = ['T-POSE', 'V-SHAPE', 'FLEX', 'L-LEFT'][Math.floor(Math.random()*4)];
-    const wallGeo = new THREE.BoxGeometry(10, 8, 0.5);
-    const hollowTex = createHollowWallTexture(currentPoseKey);
-    const mat = new THREE.MeshPhongMaterial({ map: hollowTex, transparent: true });
-    wall = new THREE.Mesh(wallGeo, mat);
+    currentPoseKey = ['T-POSE', 'V-SHAPE', 'ARCHER'][Math.floor(Math.random()*3)];
+    wall = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 0.5), new THREE.MeshPhongMaterial({ map: createHollowTexture(currentPoseKey), transparent: true }));
     wall.position.set(0, 4, -100);
     scene.add(wall);
 }
 
-// ========================
-// 3. 逻辑与动画循环
-// ========================
+// --- AI 与 逻辑 ---
 const CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
 const getA = (p1, p2) => Math.atan2(p2.y-p1.y, p2.x-p1.x)*(180/Math.PI);
 
-const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
-pose.onResults(res => {
-    document.getElementById('loading').style.display = 'none';
-    if(!res.poseLandmarks || isGameOver) return;
-    const lp = [];
-    res.poseLandmarks.forEach((lm, i) => ghostGroup.children[i].position.set((0.5 - lm.x)*12, (0.5 - lm.y)*10 + 2, 2.5));
-    CONNECTIONS.forEach(([i,j]) => {
-        const p1 = ghostGroup.children[i].position, p2 =
+async function setupAI() {
+    try {
+        const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+        pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.6 });
+        pose.onResults(res => {
+            // 一旦有结果，确保 UI 层显示，加载层关闭
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'block';
+            if(!res.poseLandmarks || isGameOver) return;
+
+            const lp = [];
+            res.poseLandmarks.forEach((lm, i) => ghostGroup.children[i].position.set((0.5 - lm.x)*12, (0.5 - lm.y)*10 + 2, 2.5));
+            CONNECTIONS.forEach(([i,j]) => {
+                const p1 = ghostGroup.children[i].position, p2 = ghostGroup.children[j].position;
+                lp.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+            });
+            skeletonLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+
+            const lm = res.poseLandmarks;
+            const matched = {
+                'T-POSE': () => Math.abs(getA(lm[11], lm[15])) < 25 && Math.abs(getA(lm[12], lm[16])) > 155,
+                'V-SHAPE': () => lm[15].y < lm[11].y && lm[16].y < lm[12].y,
+                'ARCHER': () => Math.abs(getA(lm[11], lm[13])) < 20 && lm[16].y < lm[12].y
+            }[currentPoseKey]();
+
+            if(wall.position.z > 3 && wall.position.z < 8.5 && matched && !isHit) handleResult(true);
+        });
+
+        const cam = new Camera(document.getElementById('input_video'), {
+            onFrame: async () => { await pose.send({image: document.getElementById('input_video')}); },
+            width: 640, height: 480
+        });
+        await cam.start();
+    } catch(e) { showError("AI 或 摄像头启动失败: " + e.message); }
+}
+
+function handleResult(success) {
+    if(isHit) return; isHit = true;
+    const msg = document.getElementById('flash-msg');
+    if(success) {
+        score += 300; combo++; timeLeft += 2; wallsPassed++;
+        msg.innerText = "GREAT! +2s"; msg.style.color = "#fff";
+        gameSpeed = Math.min(gameSpeed + 0.015, 1.2);
+    } else {
+        combo = 0; msg.innerText = "MISS!"; msg.style.color = "var(--u-red)";
+        gameSpeed = 0.3;
+    }
+    msg.classList.add('show');
+    document.getElementById('score-val').innerText = "★ " + score.toString().padStart(4, '0');
+    document.getElementById('combo-num').innerText = combo;
+    document.getElementById('walls-passed').innerText = wallsPassed;
+    setTimeout(() => { msg.classList.remove('show'); spawnWall(); }, 600);
+}
+
+function animate() {
+    if(isGameOver) return;
+    requestAnimationFrame(animate);
+    if(track) track.material.map.offset.y -= gameSpeed * 0.15;
+    trees.forEach(t => { t.position.z += gameSpeed * 5; if(t.position.z > 20) t.position.z = -180; });
+    if(wall) { wall.position.z += gameSpeed * 2.5; if(wall.position.z > 15 && !isHit) handleResult(false); }
+    composer.render();
+}
+
+setInterval(() => { if(timeLeft > 0) { timeLeft--; document.getElementById('timer-val').innerText = timeLeft; } }, 1000);
+
+init3D();
+setupAI();
+animate();
+</script>
+</body>
+</html>
